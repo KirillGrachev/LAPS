@@ -3,15 +3,17 @@
 //! Механика обоих поколений LAPS одинакова: агент на компьютере при
 //! очередном применении политики сравнивает срок истечения с текущим
 //! временем и генерирует новый пароль, если срок наступил. Поэтому:
-//! * **«Сбросить сейчас»** — удаляем значение атрибута срока истечения
-//!   (поведение Microsoft-командлетов `Reset-LapsADPasswordExpiration` /
-//!   `Reset-AdmPwdExpiration`): при следующем цикле политики пароль
-//!   будет заменён;
+//! * **«Сбросить сейчас»** — записываем в атрибут **текущий** FILETIME
+//!   (поведение Microsoft-командлета `Set-LapsADPasswordExpirationTime`
+//!   без `-WhenEffective`: срок наступает немедленно). Удалять атрибут
+//!   нельзя: агент не обязан трактовать отсутствие значения как
+//!   «истёк», а часть контроллеров домена запрещает удаление;
 //! * **«Продлить/изменить срок»** — пишем новый FILETIME в атрибут.
 //!
 //! Атрибуты, в которые умеем писать:
 //! * legacy LAPS — `ms-Mcs-AdmPwdExpirationTime`;
 //! * Windows LAPS — `msLAPS-PasswordExpirationTime`.
+//!
 //! В смешанном домене (присутствуют оба) обновляются оба, чтобы агенты
 //! любого поколения увидели согласованное значение.
 //!
@@ -32,8 +34,9 @@ use super::time;
 /// Режим изменения срока истечения.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RotationMode {
-    /// Немедленный сброс: значение атрибута срока удаляется,
-    /// агент сгенерирует новый пароль при следующем применении политики.
+    /// Немедленный сброс: в атрибут пишется текущий момент, срок уже
+    /// наступил. Агент сгенерирует новый пароль при следующем применении
+    /// политики.
     Now,
     /// Запись конкретной даты (наивная локальная строка
     /// `YYYY-MM-DDTHH:MM[:SS]` из datetime-пикера интерфейса).
@@ -77,10 +80,10 @@ pub fn build_rotation_mods(
     }
 
     let mods = match mode {
-        RotationMode::Now => targets
-            .into_iter()
-            .map(|attr| Mod::Delete(attr.to_string(), HashSet::new()))
-            .collect(),
+        // Сброс — это «срок наступил сейчас», а не удаление атрибута:
+        // ровно так работает Set-LapsADPasswordExpirationTime без
+        // -WhenEffective. Агент увидит истёкший срок на следующем цикле.
+        RotationMode::Now => replace_targets(targets, time::now_filetime()),
         RotationMode::At(local) => {
             let filetime = time::parse_local_naive_to_filetime(local).ok_or_else(|| {
                 AppError::Validation(format!(
@@ -95,13 +98,19 @@ pub fn build_rotation_mods(
                     "Дата вне допустимого диапазона (2000 год .. +10 лет от сегодня)".into(),
                 ));
             }
-            targets
-                .into_iter()
-                .map(|attr| Mod::Replace(attr.to_string(), HashSet::from([filetime.to_string()])))
-                .collect()
+            replace_targets(targets, filetime)
         }
     };
     Ok(mods)
+}
+
+/// Модификации `Replace` с одинаковым FILETIME для всех целевых атрибутов.
+fn replace_targets(targets: Vec<&'static str>, filetime: i64) -> Vec<Mod<String>> {
+    let value = filetime.to_string();
+    targets
+        .into_iter()
+        .map(|attr| Mod::Replace(attr.to_string(), HashSet::from([value.clone()])))
+        .collect()
 }
 
 /// Определяет, в какие атрибуты писать, по фактическому присутствию
@@ -145,22 +154,33 @@ mod tests {
             rotation_possible: rotation,
             decrypted: false,
             decrypt_method: None,
+            decrypt_error: None,
             win_expiration_present: rotation && (plain || encrypted),
             legacy_expiration_present: rotation && legacy,
         }
     }
 
     #[test]
-    fn now_mode_deletes_present_expiration_attrs() {
+    /// «Сбросить сейчас» — Replace с текущим FILETIME, а не Delete:
+    /// отсутствие атрибута не означает «срок истёк».
+    fn now_mode_writes_current_filetime() {
+        let before = time::now_filetime();
         let mods = build_rotation_mods(
             &info(LapsFlavor::WindowsPlain, false, true, false, true),
             &RotationMode::Now,
         )
         .expect("модификации");
         assert_eq!(mods.len(), 1);
-        assert!(
-            matches!(&mods[0], Mod::Delete(attr, values) if attr == "msLAPS-PasswordExpirationTime" && values.is_empty())
-        );
+        match &mods[0] {
+            Mod::Replace(attr, values) => {
+                assert_eq!(attr, "msLAPS-PasswordExpirationTime");
+                let value = values.iter().next().expect("одно значение");
+                let ft: i64 = value.parse().expect("число");
+                assert!(ft >= before, "{ft} < {before}");
+                assert!(ft <= time::now_filetime(), "{ft} в будущем");
+            }
+            other => panic!("ожидался Replace, получен {other:?}"),
+        }
     }
 
     #[test]

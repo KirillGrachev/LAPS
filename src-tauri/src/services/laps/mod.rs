@@ -8,36 +8,15 @@
 //! * legacy LAPS — `ms-Mcs-AdmPwd` (открытый текст, ACL на атрибут);
 //! * Windows LAPS — `msLAPS-Password` (JSON, открытое хранение);
 //! * Windows LAPS — `msLAPS-EncryptedPassword` (шифрованное хранение):
-//!   факт присутствия и срок истечения читаются, сам пароль не
-//!   расшифровывается — дешифровка выполняется контроллером домена
-//!   по закрытому RPC ( cmdlet `Get-LapsADPassword`), что принципиально
-//!   недоступно «чистому» LDAP-клиенту. UI показывает инженеру понятную
-//!   диагностику и доступные действия (например, сброс срока — агент
-//!   сгенерирует новый пароль; если политика домена хранит пароли
-//!   открыто, он станет читаем).
+//!   конверт разбирается по MS-ADA2 2.66, а DPAPI-NG-блок расшифровывается
+//!   нативным API Windows LAPS (`lapsutil.dll!DecryptNormalMode`, см.
+//!   [`decrypt`]). Для SSO на старых сборках без `lapsutil.dll` остаётся
+//!   запасной `NCryptUnprotectSecret`. Если у учётной записи нет прав KDS
+//!   или маршрута к контроллеру домена, карточка всё равно возвращается:
+//!   UI показывает диагностику и доступные действия (например, сброс срока —
+//!   агент сгенерирует новый пароль).
 
-#[cfg(windows)]
 mod decrypt;
-#[cfg(windows)]
-mod decrypt_module;
-#[cfg(not(windows))]
-mod decrypt_module {
-    use super::parse::WindowsPlainPassword;
-    pub fn decrypt_via_laps_module(
-        _computer_name: &str,
-        _ldap_url: &str,
-    ) -> Option<WindowsPlainPassword> {
-        None
-    }
-}
-#[cfg(not(windows))]
-mod decrypt {
-    //! Дешифровка KDS/DPAPI-NG доступна только в Windows-сборке.
-    use super::parse::WindowsPlainPassword;
-    pub fn decrypt_windows_laps_password(_blob: &[u8]) -> Option<WindowsPlainPassword> {
-        None
-    }
-}
 mod expiration;
 mod model;
 mod parse;
@@ -57,46 +36,134 @@ use crate::services::ldap::{
     open_session, read_root_dse, search, DirectoryCredentials, NormalizedEntry, OPERATION_TIMEOUT,
 };
 
+use decrypt::{decrypt_windows_laps_password, DecryptIdentity};
 use expiration::build_rotation_mods;
-use parse::{build_laps_info, ATTR_WIN_ENCRYPTED};
-use query::{find_computers, parse_query};
+use parse::{build_laps_info, parse_encrypted_laps_blob, ATTR_WIN_ENCRYPTED};
+use query::{find_computers, parse_query_async};
 
-/// Карточка компьютера: для шифрованного хранения пытаемся расшифровать
-/// пароль двумя уровнями: нативный DPAPI-NG/KDS ([`decrypt`]), затем —
-/// системный модуль Windows LAPS ([`decrypt_module`], маршрут MS-GKDI+KDS
-/// изнутри cmdlet). Не удалось — карточка остаётся без пароля, с
-/// диагностикой в UI. Модульный уровень блокирующий — только spawn_blocking.
-async fn laps_info_from_entry(entry: &NormalizedEntry, ldap_url: &str) -> LapsInfo {
+/// Учётная запись для KDS-дешифровки: явный вход даёт свой токен,
+/// SSO оставляет работу под текущим процессом.
+fn decrypt_identity(credentials: &DirectoryCredentials<'_>) -> Option<DecryptIdentity> {
+    if credentials.use_integrated_auth {
+        return None;
+    }
+    let account = credentials.bind_dn?.trim();
+    let password = credentials.password?;
+    if account.is_empty() || password.is_empty() {
+        return None;
+    }
+    let (split_domain, user) = split_bind_account(account);
+    // UPN нельзя передавать вместе с доменом; короткому имени домен
+    // подставляем из текущей Windows-сессии, если она доменная.
+    let domain = match split_domain {
+        Some(domain) => Some(domain.to_string()),
+        None if account.contains('@') => None,
+        None => current_domain(),
+    };
+    debug!(
+        domain = ?domain,
+        user,
+        "LAPS: дешифровка под явной учётной записью"
+    );
+    Some(DecryptIdentity {
+        domain,
+        user: user.to_string(),
+        password: zeroize::Zeroizing::new(password.to_string()),
+    })
+}
+
+/// NetBIOS-домен текущей Windows-сессии, если он не совпадает с именем
+/// компьютера (то есть пользователь действительно доменный).
+fn current_domain() -> Option<String> {
+    let domain = std::env::var("USERDOMAIN").ok()?.trim().to_string();
+    let computer = std::env::var("COMPUTERNAME").unwrap_or_default();
+    if domain.is_empty() || domain.eq_ignore_ascii_case(computer.trim()) {
+        None
+    } else {
+        Some(domain)
+    }
+}
+
+/// `COMPANY\user` -> (Some("COMPANY"), "user"); UPN и короткое имя
+/// передаются как есть (домен определяется Windows/UPN-суффиксом).
+fn split_bind_account(account: &str) -> (Option<&str>, &str) {
+    match account.split_once('\\') {
+        Some((domain, user)) if !domain.trim().is_empty() && !user.trim().is_empty() => {
+            (Some(domain.trim()), user.trim())
+        }
+        _ => (None, account),
+    }
+}
+
+/// Карточка компьютера: для шифрованного хранения разбираем конверт
+/// `msLAPS-EncryptedPassword` и расшифровываем DPAPI-NG-блок нативно
+/// (`NCryptUnprotectSecret`, см. [`decrypt`]). Любая ошибка (нет прав KDS,
+/// нет маршрута к контроллеру домена, повреждённый блок) не является
+/// отказом операции: карточка возвращается без пароля с диагностикой.
+async fn laps_info_from_entry(
+    entry: &NormalizedEntry,
+    credentials: &DirectoryCredentials<'_>,
+) -> LapsInfo {
     let mut info = build_laps_info(entry);
     if info.flavor != LapsFlavor::WindowsEncrypted {
         return info;
     }
-    if let Some(blob) = entry.binary(ATTR_WIN_ENCRYPTED) {
-        if let Some(plain) = decrypt::decrypt_windows_laps_password(&blob) {
-            apply_decrypted(&mut info, plain, "kds");
+
+    let Some(raw) = entry.binary(ATTR_WIN_ENCRYPTED) else {
+        info.decrypt_error = Some("значение msLAPS-EncryptedPassword пусто".to_string());
+        return info;
+    };
+    let parsed = match parse_encrypted_laps_blob(&raw) {
+        Ok(parsed) => parsed,
+        Err(reason) => {
+            tracing::warn!(
+                computer = %info.computer_name,
+                error = %reason,
+                "LAPS: заголовок msLAPS-EncryptedPassword не разобран"
+            );
+            info.decrypt_error = Some(reason);
             return info;
         }
-    }
-    let computer = info.computer_name.clone();
-    let url = ldap_url.to_string();
-    let via_module = tokio::task::spawn_blocking(move || {
-        decrypt_module::decrypt_via_laps_module(&computer, &url)
+    };
+
+    // Метка обновления из заголовка атрибута полезна и без дешифровки.
+    info.updated_at = parsed.updated_at.and_then(time::filetime_to_rfc3339_local);
+
+    // lapsutil/LogonWithCredentials — блокирующие Win32/RPC-вызовы.
+    // Уводим их с async-воркера, иначе недоступный DC подвешивает команду.
+    let candidates: Vec<Vec<u8>> = parsed.candidates.iter().map(|part| part.to_vec()).collect();
+    let identity = decrypt_identity(credentials);
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let refs: Vec<&[u8]> = candidates.iter().map(Vec::as_slice).collect();
+        decrypt_windows_laps_password(&refs, identity.as_ref())
     })
     .await
-    .ok()
-    .flatten();
-    if let Some(plain) = via_module {
-        apply_decrypted(&mut info, plain, "laps-module");
+    .unwrap_or_else(|error| Err(format!("блокирующая задача дешифровки: {error}")));
+
+    match outcome {
+        Ok(plain) => apply_decrypted(&mut info, plain),
+        Err(reason) => {
+            let full_reason = format!("{reason}; заголовок: {}", parsed.diagnostics);
+            tracing::warn!(
+                computer = %info.computer_name,
+                error = %full_reason,
+                "LAPS: шифрованный пароль не расшифрован"
+            );
+            info.decrypt_error = Some(full_reason);
+        }
     }
     info
 }
 
-fn apply_decrypted(info: &mut LapsInfo, plain: parse::WindowsPlainPassword, method: &str) {
+fn apply_decrypted(info: &mut LapsInfo, plain: parse::WindowsPlainPassword) {
     info.password = Some(plain.password);
     info.account_name = plain.account_name;
-    info.updated_at = plain.updated_at.and_then(time::filetime_to_rfc3339_local);
+    if let Some(updated_at) = plain.updated_at.and_then(time::filetime_to_rfc3339_local) {
+        info.updated_at = Some(updated_at);
+    }
     info.decrypted = true;
-    info.decrypt_method = Some(method.to_string());
+    info.decrypt_method = Some("dpapi-ng".to_string());
+    info.decrypt_error = None;
 }
 
 /// Максимум имён в диагностике неоднозначного поиска.
@@ -111,7 +178,7 @@ pub async fn search_computer(
     credentials: &DirectoryCredentials<'_>,
     raw_query: &str,
 ) -> Result<LapsInfo, AppError> {
-    let query = parse_query(raw_query)?;
+    let query = parse_query_async(raw_query).await?;
 
     let (mut ldap, _bind_ms) = open_session(credentials).await?;
     let base = resolve_base_dn(&mut ldap, credentials).await?;
@@ -138,7 +205,7 @@ pub async fn search_computer(
              стандартных контейнеров укажите точный Base DN в настройках."
         ))),
         1 => {
-            let info = laps_info_from_entry(&entries[0], credentials.ldap_url).await;
+            let info = laps_info_from_entry(&entries[0], credentials).await;
             ensure_password_readable(&info)?;
             info!(
                 computer = %info.computer_name,
@@ -204,7 +271,7 @@ pub async fn rotate_password(
     let entry = before.into_iter().next().ok_or_else(|| {
         AppError::ComputerNotFound(format!("объект {dn} не найден или перемещён"))
     })?;
-    let info_before = laps_info_from_entry(&entry, credentials.ldap_url).await;
+    let info_before = laps_info_from_entry(&entry, credentials).await;
 
     let mods = match build_rotation_mods(&info_before, mode) {
         Ok(mods) => mods,
@@ -238,7 +305,7 @@ pub async fn rotate_password(
     let _ = ldap.unbind().await;
 
     let info = match after.into_iter().next() {
-        Some(entry) => laps_info_from_entry(&entry, credentials.ldap_url).await,
+        Some(entry) => laps_info_from_entry(&entry, credentials).await,
         None => info_before,
     };
     info!(dn, mode = ?mode, "LAPS: срок истечения обновлён");
@@ -258,10 +325,9 @@ fn validate_dn(dn: &str) -> Result<(), AppError> {
             "DN объекта содержит недопустимые символы".into(),
         ));
     }
-    let starts_with_known_rdn = ["CN=", "cn=", "OU=", "ou=", "DC=", "dc="]
-        .iter()
-        .any(|prefix| dn.starts_with(prefix));
-    if !starts_with_known_rdn {
+    // Компьютер в AD всегда CN=...; OU=/DC= не принимаем: команда меняет
+    // атрибуты объекта по DN, и лишние формы — ненужная поверхность атаки.
+    if !dn.to_ascii_lowercase().starts_with("cn=") {
         return Err(AppError::Validation(
             "DN объекта компьютера должен начинаться с CN=".into(),
         ));
@@ -331,6 +397,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn splits_bind_account_for_decryption_token() {
+        assert_eq!(
+            split_bind_account(r"COMPANY\ivanov"),
+            (Some("COMPANY"), "ivanov")
+        );
+        assert_eq!(
+            split_bind_account(r" COMPANY \ ivanov "),
+            (Some("COMPANY"), "ivanov")
+        );
+        assert_eq!(
+            split_bind_account("ivanov@company.ru"),
+            (None, "ivanov@company.ru")
+        );
+        assert_eq!(split_bind_account("ivanov"), (None, "ivanov"));
+        // Кривой backslash не должен давать пустой домен/пользователь.
+        assert_eq!(split_bind_account(r"\ivanov"), (None, r"\ivanov"));
+        assert_eq!(split_bind_account(r"COMPANY\"), (None, r"COMPANY\"));
+    }
+
+    #[test]
+    fn builds_decryption_identity_only_for_explicit_login() {
+        let explicit = DirectoryCredentials {
+            ldap_url: "ldaps://dc1.company.ru",
+            base_dn: "DC=company,DC=ru",
+            bind_dn: Some(r"COMPANY\ivanov"),
+            password: Some("secret"),
+            use_start_tls: false,
+            allow_invalid_tls: false,
+            use_integrated_auth: false,
+        };
+        let identity = decrypt_identity(&explicit).expect("явная учётка");
+        assert_eq!(identity.domain.as_deref(), Some("COMPANY"));
+        assert_eq!(identity.user.as_str(), "ivanov");
+        assert_eq!(identity.password.as_str(), "secret");
+
+        let upn = DirectoryCredentials {
+            bind_dn: Some("ivanov@company.ru"),
+            ..explicit.clone()
+        };
+        let identity = decrypt_identity(&upn).expect("UPN");
+        assert!(identity.domain.is_none());
+        assert_eq!(identity.user.as_str(), "ivanov@company.ru");
+
+        let sso = DirectoryCredentials {
+            bind_dn: None,
+            password: None,
+            use_integrated_auth: true,
+            ..explicit
+        };
+        assert!(decrypt_identity(&sso).is_none());
+    }
+
+    #[test]
     fn validates_computer_dn() {
         assert!(validate_dn("CN=WS01,OU=Workstations,DC=company,DC=ru").is_ok());
         assert!(matches!(validate_dn(""), Err(AppError::Validation(_))));
@@ -341,6 +460,15 @@ mod tests {
         ));
         assert!(matches!(
             validate_dn(&("CN=x".to_string() + &"y".repeat(2000))),
+            Err(AppError::Validation(_))
+        ));
+        // Не CN= — не компьютер: OU=/DC= не принимаем.
+        assert!(matches!(
+            validate_dn("OU=Workstations,DC=company,DC=ru"),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            validate_dn("DC=company,DC=ru"),
             Err(AppError::Validation(_))
         ));
     }
@@ -363,6 +491,7 @@ mod tests {
             rotation_possible: true,
             decrypted: false,
             decrypt_method: None,
+            decrypt_error: None,
             win_expiration_present: true,
             legacy_expiration_present: false,
         };
