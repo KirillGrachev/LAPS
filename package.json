@@ -18,28 +18,28 @@
         "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" index.html vite.config.ts vitest.config.ts tsconfig.json tsconfig.node.json package.json eslint.config.js"
     },
     "dependencies": {
-        "@radix-ui/react-dialog": "^1.1.15",
-        "@tauri-apps/api": "^2.10.1",
+        "@radix-ui/react-dialog": "^1.3.1",
+        "@tauri-apps/api": "^2.12.4",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
-        "i18next": "^26.0.8",
-        "lucide-react": "^0.546.0",
-        "motion": "^12.23.24",
-        "react": "^19.0.0",
-        "react-dom": "^19.0.0",
-        "react-i18next": "^17.0.6",
+        "i18next": "^27.1.1",
+        "lucide-react": "^1.73.0",
+        "motion": "^14.14.0",
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1",
+        "react-i18next": "^18.0.1",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.5.0"
     },
     "devDependencies": {
-        "@eslint/js": "^9.39.5",
-        "@tailwindcss/vite": "^4.1.14",
-        "@tauri-apps/cli": "^2.10.1",
-        "@types/node": "^22.14.0",
+        "@eslint/js": "^10.0.1",
+        "@tailwindcss/vite": "^4.3.5",
+        "@tauri-apps/cli": "^2.12.4",
+        "@types/node": "^26.6.6",
         "@types/react": "^19.2.2",
         "@types/react-dom": "^19.2.1",
-        "@vitejs/plugin-react": "^5.0.4",
-        "eslint": "^9.39.5",
+        "@vitejs/plugin-react": "^6.3.0",
+        "eslint": "^10.15.0",
         "eslint-plugin-jsx-a11y": "^6.10.2",
         "eslint-plugin-react-hooks": "^7.1.1",
         "globals": "^17.14.0",
@@ -48,8 +48,8 @@
         "terser": "^5.47.1",
         "typescript": "~5.8.2",
         "typescript-eslint": "^8.73.0",
-        "vite": "^6.4.6",
-        "vitest": "^4.1.12"
+        "vite": "^8.3.8",
+        "vitest": "^5.1.0"
     },
     "allowScripts": {
         "esbuild@0.25.12": true
