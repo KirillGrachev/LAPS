@@ -35,7 +35,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": ["msi", "nsis"],
     "publisher": "KMAruda",
     "copyright": "Copyright © 2026 Kirill Grachev",
     "category": "Utility",
@@ -61,6 +61,9 @@
         "languages": ["Russian", "English"],
         "displayLanguageSelector": true,
         "startMenuFolder": "KMARUDA"
+      },
+      "wix": {
+        "language": "ru-RU"
       }
     }
   }
