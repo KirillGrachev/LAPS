@@ -51,6 +51,19 @@ export const t = (key: TranslationKeys | string, options?: TranslateOptions) => 
     return i18n.t(key as string, options);
 };
 
+/**
+ * Применяет сохранённый язык интерфейса к i18next и `<html lang>`.
+ * Вызывается после загрузки конфигурации: без этого выбор языка
+ * переживал сохранение в config.json, но сбрасывался при перезапуске.
+ */
+export function applyLanguage(language: string): void {
+    const next: Language = language === 'en' ? 'en' : 'ru';
+    if (i18n.language !== next) {
+        void i18n.changeLanguage(next);
+    }
+    document.documentElement.lang = next;
+}
+
 export function useTranslation() {
     const { t, i18n: i18nInstance } = useI18nTranslation();
 

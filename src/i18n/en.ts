@@ -51,6 +51,9 @@ export const en = {
         copiedToast: 'Password copied to clipboard',
         clipboardClearToast: 'Clipboard will be cleared in {{seconds}} s',
         clipboardClearedToast: 'Clipboard cleared',
+        clipboardClearFailed:
+            'Could not clear the clipboard: the password may still be there — copy some other text over it',
+        copyAuditError: 'Password copied, but the audit event was not recorded',
         expiration: {
             placeholder: 'Select date and time',
             time: 'Time',
@@ -60,14 +63,15 @@ export const en = {
             expired: 'expired {{date}} — the agent will rotate the password',
             expiresIn: 'expires in {{days}} d',
             expiresSoon: 'expires today',
-            resetPending: 'expiration reset — the agent will generate a new password at the next policy refresh',
+            resetPending: 'expiration not set',
             notSet: 'not set',
         },
         encrypted: {
             notDecrypted: 'Password not decrypted',
-            decryptedNoteKds: 'Password decrypted by native Windows means (domain KDS) thanks to your account rights.',
-            decryptedNoteModule:
-                'Password decrypted by the system Windows LAPS module (Get-LapsADPassword) thanks to your account rights.',
+            decryptedNote: 'Password decrypted natively via DPAPI-NG and the domain KDS, using your account rights.',
+            notDecryptedHint:
+                'The account has no KDS decryption rights, there is no route to a domain controller, or the Windows LAPS module is missing. Encrypted LAPS requires the delegated password-read permission and the Windows LAPS component. For explicit sign-in, enter the account as DOMAIN\\user or user@domain.',
+            decryptErrorLabel: 'Diagnostics',
         },
         rotation: {
             title: 'Expiration management',
@@ -89,6 +93,7 @@ export const en = {
             empty: 'Enter a computer name, FQDN or IP address',
             pattern: 'Allowed: A-Z, 0-9, hyphen (up to 15 chars), FQDN or an IPv4/IPv6 address',
             max: 'Query is too long (max 255 characters)',
+            invalidDate: 'Enter a valid date and time',
         },
     },
     audit: {
@@ -120,6 +125,13 @@ export const en = {
             logout: 'Sign-out',
             connection_test: 'Connection test',
         },
+        flavors: {
+            legacy: 'Legacy LAPS',
+            windows_plain: 'Windows LAPS',
+            windows_encrypted: 'Windows LAPS (encrypted)',
+            none: 'No data',
+        },
+        demoBanner: 'Test mode: this journal lives in the browser and contains demo events, not the real audit trail.',
         ok: 'OK',
     },
     settings: {
@@ -129,6 +141,10 @@ export const en = {
         saveError: 'Failed to save settings',
         ad: {
             title: 'Active Directory settings',
+            encryptedHint:
+                'Encrypted Windows LAPS is decrypted by the native Windows LAPS API: under the entered account for explicit sign-in, or the current account for SSO. KDS rights and the Windows LAPS module are required.',
+            tlsRequiredHint:
+                'ldap:// automatically uses StartTLS; ldaps:// (port 636) is preferred. Plain LDAP is never used.',
             testModeLabel: 'Test mode',
             testModeDesc:
                 'Demo data instead of Active Directory queries. Useful for exploring the interface without domain access.',
@@ -139,7 +155,7 @@ export const en = {
             baseDnPlaceholder: 'E.G. DC=COMPANY,DC=RU',
             baseDnHint: 'Empty — resolved automatically from rootDSE (defaultNamingContext)',
             startTlsLabel: 'StartTLS',
-            startTlsHint: 'Encryption over ldap:// (port 389)',
+            startTlsHint: 'Required for ldap://: enabled automatically, cannot be turned off',
             startTlsLdapsNote: 'Not used: ldaps:// is already encrypted (port 636)',
             invalidTlsLabel: 'Do not verify the server certificate',
             invalidTlsHint: 'For internal CAs with self-signed certificates',
@@ -218,6 +234,7 @@ export const en = {
         LDAP_TIMEOUT: 'Directory server did not respond in time (check network/VPN)',
         LDAP_AUTH: 'Directory authorization failed',
         LDAP_TLS: 'Secure connection (TLS) error',
+        LDAP_INSECURE: 'LDAPS or StartTLS is required: passwords must not cross plain LDAP',
         LDAP_PROTOCOL: 'LDAP protocol error',
         COMPUTER_NOT_FOUND: 'Computer not found in Active Directory',
         COMPUTER_AMBIGUOUS: 'Multiple computers found — refine the name',

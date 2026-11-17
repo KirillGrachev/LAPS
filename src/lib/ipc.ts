@@ -67,7 +67,9 @@ export async function dropAllSessions(): Promise<void> {
         try {
             const { invoke } = await import('@tauri-apps/api/core');
             await invoke('logout');
-        } catch {}
+        } catch {
+            // Сессии уже нет или бэкенд недоступен — сбрасывать нечего.
+        }
     }
 }
 

@@ -31,8 +31,8 @@ export interface AppConfig {
     testMode: boolean;
 }
 
-/** Данные для `save_config` (без вычисляемого `hasPassword`). */
-export type SaveConfigRequest = Omit<AppConfig, 'hasPassword'>;
+/** Данные для `save_config`: тот же конфиг без серверных вычисляемых полей. */
+export type SaveConfigRequest = AppConfig;
 
 /** Вариант хранения пароля LAPS (сериализация `LapsFlavor`). */
 export type LapsFlavor = 'legacy' | 'windowsPlain' | 'windowsEncrypted' | 'none';
@@ -54,8 +54,10 @@ export interface LapsInfo {
     expiresAt: string | null;
     /** Пароль получен расшифровкой msLAPS-EncryptedPassword (KDS/DPAPI-NG). */
     decrypted: boolean;
-    /** Метод дешифровки: `kds` (нативно) или `laps-module` (модуль Windows LAPS). */
+    /** Метод дешифровки: `dpapi-ng` (нативный Windows LAPS / DPAPI-NG). */
     decryptMethod?: string | null;
+    /** Техническая причина, по которой шифрованный пароль не расшифрован. */
+    decryptError?: string | null;
     legacyPresent: boolean;
     windowsPlainPresent: boolean;
     encryptedPresent: boolean;

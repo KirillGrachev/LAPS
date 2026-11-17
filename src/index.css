@@ -1,7 +1,48 @@
 @import 'tailwindcss';
+
+/*
+ * Фирменная типографика KMAruda — Montserrat (так же, как в PhoneBook).
+ * Шрифты лежат локально в public/fonts: приложение не ходит в сеть за
+ * шрифтом (CSP font-src 'self'), а Windows-сборка одинаково выглядит на
+ * машинах без установленного Montserrat. Лицензия — OFL.txt рядом.
+ */
+@font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/montserrat-400.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/fonts/montserrat-500.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/fonts/montserrat-600.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/montserrat-700.ttf') format('truetype');
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+    /* Утилита font-sans и preflight Tailwind используют фирменный Montserrat. */
+    --font-sans: 'Montserrat', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-surface: var(--surface);
@@ -37,6 +78,7 @@ body {
 html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     background-color: var(--background);
 }
 
@@ -48,7 +90,14 @@ select {
 }
 
 :root {
-    font-family: 'Segoe UI', Inter, Avenir, Helvetica, Arial, sans-serif;
+    font-family:
+        'Montserrat',
+        'Segoe UI',
+        system-ui,
+        -apple-system,
+        'Helvetica Neue',
+        Arial,
+        sans-serif;
     --background: #f8fafc;
     --foreground: #334155;
     --surface: #ffffff;

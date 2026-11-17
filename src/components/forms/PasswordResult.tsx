@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff, CheckCircle2, Copy, Monitor, Globe, UserCog, Clock, Sparkles } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -9,8 +9,15 @@ import { expirationStatus, formatDateTime } from '../../lib/format';
 
 export interface PasswordResultProps {
     result: LapsInfo | null;
-    copyPassword: () => void;
+    /** true — пароль реально попал в буфер обмена. */
+    copyPassword: () => Promise<boolean>;
 }
+
+/** Через сколько секунд показанный пароль снова маскируется. */
+const AUTO_HIDE_MS = 30_000;
+
+/** Длина маски фиксирована: по числу точек не должно быть видно длину пароля. */
+const MASK_LENGTH = 16;
 
 /** Строка статуса срока истечения (цвет подсказывает срочность). */
 function ExpirationStatusLine({ result }: { result: LapsInfo }) {
@@ -56,12 +63,32 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [copied, setCopied] = useState(false);
 
+    // Новая карточка (другой компьютер или новый пароль после ротации) —
+    // снова маска: нельзя показывать секрет только потому, что у предыдущего
+    // пароля нажали «показать». Ключ — пара DN + значение пароля.
+    useEffect(() => {
+        setIsVisible(false);
+        setCopied(false);
+    }, [result?.dn, result?.password]);
+
+    // Показанный пароль сам маскируется через 30 секунд.
+    useEffect(() => {
+        if (!isVisible) return;
+        const timer = window.setTimeout(() => setIsVisible(false), AUTO_HIDE_MS);
+        return () => window.clearTimeout(timer);
+    }, [isVisible]);
+
+    useEffect(() => {
+        if (!copied) return;
+        const timer = window.setTimeout(() => setCopied(false), 2000);
+        return () => window.clearTimeout(timer);
+    }, [copied]);
+
     if (!result) return null;
 
-    const handleCopy = () => {
-        void copyPassword();
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async () => {
+        // Не показываем «Готово», если clipboard.writeText упал.
+        setCopied(await copyPassword());
     };
 
     return (
@@ -95,10 +122,17 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
             {result.decrypted && result.password !== null && (
                 <div className="flex items-center gap-2 text-[0.72rem] font-bold text-primary">
                     <Sparkles size={13} className="shrink-0" />
-                    {t(
-                        result.decryptMethod === 'kds'
-                            ? 'search.encrypted.decryptedNoteKds'
-                            : 'search.encrypted.decryptedNoteModule',
+                    {t('search.encrypted.decryptedNote')}
+                </div>
+            )}
+
+            {result.flavor === 'windowsEncrypted' && result.password === null && (
+                <div className="flex flex-col gap-1 text-[0.72rem] font-medium text-muted-foreground leading-relaxed">
+                    <span>{t('search.encrypted.notDecryptedHint')}</span>
+                    {result.decryptError && (
+                        <span className="font-mono text-[0.66rem] text-muted-foreground/60 break-all">
+                            {t('search.encrypted.decryptErrorLabel')}: {result.decryptError}
+                        </span>
                     )}
                 </div>
             )}
@@ -134,7 +168,7 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                                         ? t('search.encrypted.notDecrypted')
                                         : isVisible
                                           ? result.password
-                                          : '•'.repeat(Math.min(result.password.length, 24))
+                                          : '•'.repeat(MASK_LENGTH)
                                 }
                                 readOnly
                                 tabIndex={0}
@@ -157,7 +191,7 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                         <Button
                             variant={copied ? 'primary' : 'outline'}
                             type="button"
-                            onClick={handleCopy}
+                            onClick={() => void handleCopy()}
                             disabled={!result.password}
                             className={`relative font-black h-[40px] sm:h-[44px] px-8 transition-all w-full sm:w-[160px] sm:min-w-[160px] flex-shrink-0 ${
                                 copied

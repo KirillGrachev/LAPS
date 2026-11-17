@@ -18,6 +18,7 @@ import { PageLayout } from '../ui/PageLayout';
 import { Button } from '../ui/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
 import { useTranslation } from '../../i18n/index.tsx';
+import { isTestModeActive } from '../../lib/ipc';
 import { useAuditLogs } from '../../hooks/useAuditLogs';
 import { formatLogTime } from '../../lib/format';
 import type { AuditAction } from '../../types';
@@ -84,6 +85,12 @@ export function AuditTab() {
             contentClassName="overflow-y-auto p-4 sm:p-6"
         >
             <div className="w-full max-w-6xl mx-auto flex flex-col gap-4">
+                {isTestModeActive() && (
+                    <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-[0.75rem] font-bold text-amber-600 dark:text-amber-400">
+                        {t('audit.demoBanner')}
+                    </div>
+                )}
+
                 {error && (
                     <div className="rounded-lg border border-red-500/25 bg-red-500/5 px-4 py-3 text-[0.8rem] font-bold text-red-500">
                         {error}
@@ -142,7 +149,7 @@ export function AuditTab() {
                                                     {event.target}
                                                 </TableCell>
                                                 <TableCell className="text-[0.75rem] text-muted-foreground whitespace-nowrap">
-                                                    {event.flavor ?? '—'}
+                                                    {event.flavor ? t(`audit.flavors.${event.flavor}`) : '—'}
                                                 </TableCell>
                                                 <TableCell className="whitespace-nowrap">
                                                     {ok ? (

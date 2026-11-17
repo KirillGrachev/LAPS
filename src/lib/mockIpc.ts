@@ -101,6 +101,7 @@ function demoComputer(query: string): LapsInfo {
             encryptedPresent: false,
             rotationPossible: true,
             decryptMethod: null,
+            decryptError: null,
         };
     }
     if (name === 'SRV-LEG01') {
@@ -120,6 +121,7 @@ function demoComputer(query: string): LapsInfo {
             encryptedPresent: false,
             rotationPossible: true,
             decryptMethod: null,
+            decryptError: null,
         };
     }
     if (name === 'WS03') {
@@ -139,6 +141,7 @@ function demoComputer(query: string): LapsInfo {
             encryptedPresent: true,
             rotationPossible: true,
             decryptMethod: null,
+            decryptError: 'DecryptNormalMode: 0x8009002C (учётная запись не авторизована на дешифровку LAPS (KDS))',
         };
     }
     if (name === 'WS04') {
@@ -149,7 +152,7 @@ function demoComputer(query: string): LapsInfo {
             operatingSystem: 'Windows 11 Pro',
             flavor: 'windowsEncrypted',
             accountName: 'Administrator',
-            password: 'D3crypt3d!ViaModule',
+            password: 'D3crypt3d!ViaDpapiNg',
             updatedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
             expiresAt: futureDate(25),
             legacyPresent: false,
@@ -157,7 +160,8 @@ function demoComputer(query: string): LapsInfo {
             encryptedPresent: true,
             rotationPossible: true,
             decrypted: true,
-            decryptMethod: 'laps-module',
+            decryptMethod: 'dpapi-ng',
+            decryptError: null,
         };
     }
     if (name === 'WS-NOLAPS') {
@@ -227,27 +231,62 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
             if (!mockSession) fail('NOT_AUTHENTICATED', 'Требуется вход: выполните аутентификацию, чтобы продолжить');
             const query = String(args?.query ?? '');
             if (!query.trim()) fail('VALIDATION', 'Введите имя компьютера, FQDN или IP-адрес');
-            const info = demoComputer(query);
-            pushAudit({ action: 'search', target: info.computerName, flavor: info.flavor, code: 'OK' });
-            return info as T;
+            try {
+                const info = demoComputer(query);
+                pushAudit({ action: 'search', target: info.computerName, flavor: info.flavor, code: 'OK' });
+                return info as T;
+            } catch (err) {
+                const ipc = err as IpcError;
+                // Журнал тестового режима обязан повторять бэкенд: неудачный поиск
+                // тоже пишет строку search_failed с кодом ошибки.
+                pushAudit({
+                    action: 'search_failed',
+                    target: query.trim(),
+                    code: ipc.code ?? 'UNKNOWN',
+                    details: ipc.message,
+                });
+                throw err;
+            }
         }
         case 'rotate_password': {
             if (!mockSession) fail('NOT_AUTHENTICATED', 'Требуется вход: выполните аутентификацию, чтобы продолжить');
             const dn = String(args?.dn ?? '');
             const mode = String(args?.mode ?? '');
-            const info = demoComputer(dn.replace(/^CN=/, '').split(',')[0]);
-            const rotated: LapsInfo = {
-                ...info,
-                expiresAt: mode === 'now' ? null : new Date(String(args?.localDateTime ?? '')).toISOString(),
-            };
-            pushAudit({
-                action: 'rotate',
-                target: info.computerName,
-                flavor: info.flavor,
-                code: 'OK',
-                details: mode === 'now' ? 'reset-now' : `set:${args?.localDateTime ?? ''}`,
-            });
-            return rotated as T;
+            try {
+                const name = dn.replace(/^CN=/i, '').split(',')[0];
+                const info = demoComputer(name);
+                if (!info.rotationPossible) {
+                    fail('NO_LAPS_DATA', 'На объекте компьютера нет атрибута срока истечения LAPS.');
+                }
+                let expiresAt: string;
+                if (mode === 'now') {
+                    expiresAt = new Date().toISOString();
+                } else {
+                    const parsed = new Date(String(args?.localDateTime ?? ''));
+                    if (Number.isNaN(parsed.getTime())) {
+                        fail('VALIDATION', 'Некорректная дата/время: ожидается формат ГГГГ-ММ-ДДTЧЧ:ММ.');
+                    }
+                    expiresAt = parsed.toISOString();
+                }
+                const rotated: LapsInfo = { ...info, expiresAt };
+                pushAudit({
+                    action: 'rotate',
+                    target: info.computerName,
+                    flavor: info.flavor,
+                    code: 'OK',
+                    details: mode === 'now' ? 'reset-now' : `set:${args?.localDateTime ?? ''}`,
+                });
+                return rotated as T;
+            } catch (err) {
+                const ipc = err as IpcError;
+                pushAudit({
+                    action: 'rotate_failed',
+                    target: dn || '-',
+                    code: ipc.code ?? 'UNKNOWN',
+                    details: ipc.message,
+                });
+                throw err;
+            }
         }
         case 'note_password_copied': {
             if (!mockSession) fail('NOT_AUTHENTICATED', 'Требуется вход');
