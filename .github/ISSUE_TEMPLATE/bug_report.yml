@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible defect in KMAruda LAPS
+title: 'bug: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste a LAPS password, a sign-in password, a token, a real domain
+        name or an internal computer name. Replace them with placeholders.
+        Security issues belong in private reporting, see SECURITY.md.
+
+  - type: input
+    id: version
+    attributes:
+      label: Application version
+      description: From the About tab or the installer file name.
+      placeholder: 2.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and architecture
+      placeholder: Windows 11 24H2 x64 / Windows Server 2022
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Settings → Active Directory
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the error code (`LDAP_TLS`, `COMPUTER_NOT_FOUND`, ...) and the decrypt diagnostic text when relevant.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: laps
+    attributes:
+      label: LAPS storage
+      options:
+        - Legacy LAPS (ms-Mcs-AdmPwd)
+        - Windows LAPS, plain (msLAPS-Password)
+        - Windows LAPS, encrypted (msLAPS-EncryptedPassword)
+        - Not sure
+    validations:
+      required: true
