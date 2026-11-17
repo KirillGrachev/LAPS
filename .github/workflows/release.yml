@@ -91,8 +91,8 @@ jobs:
           releaseBody: |
             ## Install
 
-            Normal users: use `KMAruda LAPS___VERSION___x64-setup.exe`. The
-            `KMAruda LAPS___VERSION___x64_ru-RU.msi` is the MSI payload for
+            Normal users: use `KMAruda.LAPS___VERSION___x64-setup.exe`. The
+            `KMAruda.LAPS___VERSION___x64_ru-RU.msi` is the MSI payload for
             enterprise deployment. The
             `KMAruda.LAPS___VERSION___windows-x64_portable.zip` runs without
             installation. The WebView2 bootstrapper is embedded in the installer.
