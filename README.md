@@ -80,9 +80,10 @@ See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the full matrix.
 
 Download the NSIS installer from
 [Releases](https://github.com/KirillGrachev/LAPS/releases/latest) and run it.
-The installer bundles the WebView2 bootstrapper and does not contain any
-PowerShell or `.ps1` payload; the only NSIS hook closes a running instance
-before an upgrade.
+Enterprise deployment can use the MSI from the same release, and the portable
+ZIP runs without installation. The installer bundles the WebView2 bootstrapper
+and does not contain any PowerShell or `.ps1` payload; the only NSIS hook closes
+a running instance before an upgrade.
 
 First run:
 
