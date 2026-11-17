@@ -57,7 +57,14 @@ Output:
 
 ```
 src-tauri/target/release/bundle/nsis/KMAruda LAPS_2.1.0_x64-setup.exe
+src-tauri/target/release/bundle/msi/KMAruda LAPS_2.1.0_x64_ru-RU.msi
 ```
+
+The MSI is built by WiX 3.14. On a workstation whose `%TEMP%` contains
+non-ASCII characters, `light.exe` can fail with `LGHT0001` /
+`0x8007007B` while creating the cabinet; point `TEMP` and `TMP` to an ASCII
+directory (for example `C:\Temp`) for the build. GitHub runners use ASCII
+paths, so CI is not affected.
 
 The NSIS package uses the branded header/sidebar images from
 `src-tauri/installer/`, offers per-user and per-machine installs, includes the
