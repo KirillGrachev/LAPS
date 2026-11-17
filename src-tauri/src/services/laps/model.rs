@@ -16,8 +16,9 @@ pub enum LapsFlavor {
     /// Windows LAPS (2023+), открытое хранение: JSON в `msLAPS-Password`.
     WindowsPlain,
     /// Windows LAPS, шифрованное хранение: только `msLAPS-EncryptedPassword`.
-    /// Расшифровка возможна лишь через RPC к контроллеру домена
-    /// (`Get-LapsADPassword`) и нативным LDAP-чтением не выполняется.
+    /// Пароль расшифровывается нативно через DPAPI-NG/KDS
+    /// (`lapsutil.dll!DecryptNormalMode`): нужны права на дешифровку и
+    /// маршрут к контроллеру домена. Без них карточка возвращается без пароля.
     WindowsEncrypted,
     /// Компьютер найден, но ни один LAPS-атрибут не виден: не enrolled,
     /// пароль ещё не сгенерирован или нет прав чтения атрибутов
@@ -69,11 +70,16 @@ pub struct LapsInfo {
     /// KDS/DPAPI-NG (Windows LAPS с шифрованным хранением).
     #[serde(default)]
     pub decrypted: bool,
-    /// Как именно получен расшифрованный пароль: `kds` (нативный
-    /// NCryptUnprotectSecret) или `laps-module` (системный модуль
-    /// Windows LAPS, Get-LapsADPassword). Прозрачность происхождения.
+    /// Как именно получен расшифрованный пароль. Сейчас единственный
+    /// путь — `dpapi-ng` (нативный `NCryptUnprotectSecret`, KDS домена);
+    /// поле оставлено для прозрачности происхождения и будущих методов.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decrypt_method: Option<String>,
+    /// Техническая причина, по которой шифрованный пароль не расшифрован
+    /// (HRESULT DPAPI-NG, повреждённый конверт). Секретов не содержит;
+    /// UI показывает её как диагностику, а не как отказ операции.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decrypt_error: Option<String>,
     /// Какие наборы атрибутов физически присутствуют на объекте —
     /// для диагностики смешанных/мигрирующих доменов в UI.
     pub legacy_present: bool,

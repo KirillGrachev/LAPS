@@ -33,6 +33,10 @@ pub enum AppError {
     #[error("Ошибка защищённого соединения (TLS): {0}")]
     LdapTls(String),
 
+    /// Попытка работать с LAPS/учётными данными по незашифрованному LDAP.
+    #[error("{0}")]
+    LdapInsecure(String),
+
     #[error("Ошибка протокола LDAP: {0}")]
     LdapProtocol(String),
 
@@ -77,6 +81,7 @@ impl AppError {
             Self::LdapTimeout => "LDAP_TIMEOUT",
             Self::LdapAuth(_) => "LDAP_AUTH",
             Self::LdapTls(_) => "LDAP_TLS",
+            Self::LdapInsecure(_) => "LDAP_INSECURE",
             Self::LdapProtocol(_) => "LDAP_PROTOCOL",
             Self::ComputerNotFound(_) => "COMPUTER_NOT_FOUND",
             Self::ComputerAmbiguous(_) => "COMPUTER_AMBIGUOUS",
@@ -137,6 +142,7 @@ mod tests {
             AppError::LdapTimeout,
             AppError::LdapAuth("x".into()),
             AppError::LdapTls("x".into()),
+            AppError::LdapInsecure("x".into()),
             AppError::LdapProtocol("x".into()),
             AppError::ComputerNotFound("x".into()),
             AppError::ComputerAmbiguous("x".into()),

@@ -5,7 +5,8 @@
 //!    (Kerberos/NTLM через SSPI). Пароль не вводится и не хранится:
 //!    инженер работает под своей доменной учёткой, права чтения
 //!    LAPS-атрибутов делегируются группе поддержки на стороне AD.
-//! 2. **Простой bind** — сервисная учётка (DN + пароль из keyring).
+//! 2. **Простой bind** — учётная запись, введённая на экране входа
+//!    (DN/UPN/sAMAccountName + пароль из памяти сессии).
 //! 3. **Анонимный** — только если учётка не задана (современные домены
 //!    анонимный поиск запрещают; ошибка классифицируется в `errors.rs`).
 
@@ -29,30 +30,58 @@ pub(super) async fn connect(
     credentials: &DirectoryCredentials<'_>,
 ) -> Result<ldap3::Ldap, AppError> {
     let url = credentials.ldap_url.trim();
-    if !(url.starts_with("ldap://") || url.starts_with("ldaps://")) {
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("ldap://") || lower.starts_with("ldaps://")) {
         return Err(AppError::Validation(
             "Адрес сервера должен начинаться с ldap:// или ldaps://".into(),
         ));
     }
+    let is_ldap = lower.starts_with("ldap://");
+
+    // Пароли LAPS и учётные данные не должны идти по открытому LDAP.
+    // Для ldap:// StartTLS включается автоматически; ldaps:// уже шифрован.
+    let start_tls = credentials.use_start_tls || is_ldap;
+    if !is_secure_transport(&lower, start_tls) {
+        return Err(AppError::LdapInsecure(format!(
+            "{url}: соединение не шифруется. Используйте ldaps://<dc>:636 \
+             или StartTLS (Настройки → Active Directory)."
+        )));
+    }
+
+    // Схема в URL нормализована валидацией конфигурации, но сессия может
+    // прийти и из старого config.json — приводим её здесь ещё раз.
+    let normalized = {
+        let (_, rest) = url.split_once("://").unwrap_or(("", url));
+        if lower.starts_with("ldaps://") {
+            format!("ldaps://{rest}")
+        } else {
+            format!("ldap://{rest}")
+        }
+    };
 
     let mut settings = LdapConnSettings::new().set_conn_timeout(CONNECT_TIMEOUT);
-    if credentials.use_start_tls && url.starts_with("ldap://") {
+    if start_tls && is_ldap {
         settings = settings.set_starttls(true);
     }
     if credentials.allow_invalid_tls {
         settings = settings.set_no_tls_verify(true);
     }
 
-    let (conn, ldap) = LdapConnAsync::with_settings(settings, url)
+    let (conn, ldap) = LdapConnAsync::with_settings(settings, &normalized)
         .await
         .map_err(|e| classify_error(url, &e))?;
 
     ldap3::drive!(conn);
 
-    if credentials.use_start_tls {
-        info!(url, "StartTLS запрошен");
+    if start_tls && is_ldap {
+        info!(url, "StartTLS включён (автоматически для ldap://)");
     }
     Ok(ldap)
+}
+
+/// Шифруется ли транспорт: `ldaps://` или `ldap://` + StartTLS.
+fn is_secure_transport(url: &str, use_start_tls: bool) -> bool {
+    url.starts_with("ldaps://") || (url.starts_with("ldap://") && use_start_tls)
 }
 
 /// Извлекает FQDN хоста из LDAP-URL (нужен для SPN `ldap/<fqdn>` в GSSAPI).
@@ -127,6 +156,15 @@ pub(super) async fn bind(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requires_encrypted_transport_for_credentials() {
+        assert!(is_secure_transport("ldaps://dc1.company.ru:636", false));
+        assert!(is_secure_transport("ldaps://dc1.company.ru", true));
+        assert!(is_secure_transport("ldap://dc1.company.ru", true));
+        assert!(!is_secure_transport("ldap://dc1.company.ru", false));
+        assert!(!is_secure_transport("ldap://dc1.company.ru:389", false));
+    }
 
     #[test]
     fn extracts_host_fqdn_from_ldap_urls() {
