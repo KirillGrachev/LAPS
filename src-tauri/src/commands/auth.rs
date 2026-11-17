@@ -16,7 +16,9 @@ use tracing::info;
 use zeroize::Zeroizing;
 
 use crate::error::AppError;
-use crate::services::audit::{current_actor, AuditAction, AuditLogger};
+#[cfg(windows)]
+use crate::services::audit::current_actor;
+use crate::services::audit::{AuditAction, AuditLogger};
 use crate::services::config::{ensure_connection_config, ConfigStore};
 use crate::services::ldap::{open_session, DirectoryCredentials};
 use crate::state::{AppState, Session};

@@ -210,6 +210,10 @@ fn hex_preview(raw: &[u8]) -> String {
 /// Windows LAPS пишет UTF-16LE JSON (`{"n":...,"t":...,"p":...}`), но
 /// встречаются агенты, сохраняющие UTF-8. Пробуем UTF-16LE, затем UTF-8;
 /// BOM и завершающие NUL отбрасываются.
+///
+/// На не-Windows сборке функция используется только тестами: сам вызов
+/// дешифровки живёт в Windows-модуле.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn parse_windows_plain_payload(raw: &[u8]) -> Option<WindowsPlainPassword> {
     parse_windows_plain_utf16le(raw).or_else(|| {
         let text = std::str::from_utf8(raw).ok()?;
@@ -217,14 +221,17 @@ pub fn parse_windows_plain_payload(raw: &[u8]) -> Option<WindowsPlainPassword> {
     })
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 fn parse_windows_plain_utf16le(raw: &[u8]) -> Option<WindowsPlainPassword> {
     // Нечётная длина — почти наверняка не UTF-16LE: не рискуем.
     if raw.len() < 2 || !raw.len().is_multiple_of(2) {
         return None;
     }
     let units: Vec<u16> = raw
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
         .collect();
     let text = String::from_utf16_lossy(&units);
     parse_windows_plain_json(text.trim_matches(['\0', '\u{feff}']).trim())
