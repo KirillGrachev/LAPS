@@ -1,6 +1,6 @@
 import { InputHTMLAttributes, forwardRef } from 'react';
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {}
+export type InputProps = InputHTMLAttributes<HTMLInputElement>;
 
 /**
  * Поле ввода без обводки: слой обозначается только фоном.

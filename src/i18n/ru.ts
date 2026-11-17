@@ -51,6 +51,9 @@ export const ru = {
         copiedToast: 'Пароль скопирован в буфер обмена',
         clipboardClearToast: 'Буфер обмена будет очищен через {{seconds}} с',
         clipboardClearedToast: 'Буфер обмена очищен',
+        clipboardClearFailed:
+            'Не удалось очистить буфер обмена: пароль мог остаться в буфере — скопируйте поверх него другой текст',
+        copyAuditError: 'Пароль скопирован, но событие аудита не записалось',
         expiration: {
             placeholder: 'Выберите дату и время',
             time: 'Время',
@@ -60,15 +63,15 @@ export const ru = {
             expired: 'истёк {{date}} — пароль будет заменён агентом',
             expiresIn: 'истекает через {{days}} дн.',
             expiresSoon: 'истекает сегодня',
-            resetPending: 'срок сброшен — агент сгенерирует новый пароль при следующем применении политики',
+            resetPending: 'срок действия не задан',
             notSet: 'не задан',
         },
         encrypted: {
             notDecrypted: 'Пароль не расшифрован',
-            decryptedNoteKds:
-                'Пароль расшифрован штатными средствами Windows (KDS домена) благодаря правам вашей учётной записи.',
-            decryptedNoteModule:
-                'Пароль расшифрован системным модулем Windows LAPS (Get-LapsADPassword) благодаря правам вашей учётной записи.',
+            decryptedNote: 'Пароль расшифрован нативно: DPAPI-NG и KDS домена, по правам вашей учётной записи.',
+            notDecryptedHint:
+                'Учётная запись не имеет прав на дешифровку KDS, нет маршрута к контроллеру домена или не установлен модуль Windows LAPS. Для шифрованного LAPS нужны делегированное право чтения пароля и компонент Windows LAPS. При явном входе указывайте учётную запись как DOMAIN\\user или user@domain.',
+            decryptErrorLabel: 'Диагностика',
         },
         rotation: {
             title: 'Управление сроком действия',
@@ -90,6 +93,7 @@ export const ru = {
             empty: 'Введите имя компьютера, FQDN или IP-адрес',
             pattern: 'Допускаются A-Z, 0-9, дефис (до 15 символов), FQDN или IPv4/IPv6-адрес',
             max: 'Запрос слишком длинный (максимум 255 символов)',
+            invalidDate: 'Укажите корректные дату и время',
         },
     },
     audit: {
@@ -121,6 +125,14 @@ export const ru = {
             logout: 'Выход',
             connection_test: 'Проверка подключения',
         },
+        flavors: {
+            legacy: 'Legacy LAPS',
+            windows_plain: 'Windows LAPS',
+            windows_encrypted: 'Windows LAPS (шифр.)',
+            none: 'Нет данных',
+        },
+        demoBanner:
+            'Тестовый режим: журнал ведётся в браузере и содержит демонстрационные события, а не реальный аудит.',
         ok: 'OK',
     },
     settings: {
@@ -131,6 +143,10 @@ export const ru = {
         ad: {
             title: 'Настройки Active Directory',
             hint: 'Подключение к каталогу домена. Права чтения LAPS-атрибутов делегируются вашей учётной записи на стороне AD — права администратора домена не требуются.',
+            encryptedHint:
+                'Шифрованный Windows LAPS дешифруется системным API Windows LAPS: при явном входе — под введённой учётной записью, при SSO — под текущей. Нужны права KDS и модуль Windows LAPS.',
+            tlsRequiredHint:
+                'Для ldap:// автоматически используется StartTLS; предпочтительно ldaps:// (порт 636). Открытый LDAP приложение не использует.',
             testModeLabel: 'Тестовый режим',
             testModeDesc:
                 'Демо-данные вместо запросов к Active Directory. Полезно для ознакомления с интерфейсом без доступа к домену.',
@@ -140,7 +156,7 @@ export const ru = {
             baseDnPlaceholder: 'НАПР. DC=COMPANY,DC=RU',
             baseDnHint: 'Пусто — автоматически из rootDSE (defaultNamingContext)',
             startTlsLabel: 'StartTLS',
-            startTlsHint: 'Шифрование поверх ldap:// (порт 389)',
+            startTlsHint: 'Обязательно для ldap://: включается автоматически, отключить нельзя',
             startTlsLdapsNote: 'Не используется: ldaps:// уже шифрует соединение (порт 636)',
             invalidTlsLabel: 'Не проверять сертификат сервера',
             invalidTlsHint: 'Для внутренних CA с самоподписанными сертификатами',
@@ -219,6 +235,7 @@ export const ru = {
         LDAP_TIMEOUT: 'Сервер каталога не ответил вовремя (проверьте сеть/VPN)',
         LDAP_AUTH: 'Отказано в авторизации в каталоге',
         LDAP_TLS: 'Ошибка защищённого соединения (TLS)',
+        LDAP_INSECURE: 'Нужен LDAPS или StartTLS: пароли нельзя передавать по открытому LDAP',
         LDAP_PROTOCOL: 'Ошибка протокола LDAP',
         COMPUTER_NOT_FOUND: 'Компьютер не найден в Active Directory',
         COMPUTER_AMBIGUOUS: 'Найдено несколько компьютеров — уточните имя',

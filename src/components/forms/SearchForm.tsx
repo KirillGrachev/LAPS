@@ -77,6 +77,7 @@ export function SearchForm({
                     <Button
                         type="button"
                         variant="outline"
+                        disabled={isDisabled}
                         onClick={(e) => {
                             e.preventDefault();
                             onClear?.();

@@ -1,8 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { AppConfig, SaveConfigRequest } from '../types';
 import { tauriInvoke, toIpcError, setTestModeActive } from '../lib/ipc';
-import { t } from '../i18n/index.tsx';
+import { applyLanguage, t } from '../i18n/index.tsx';
 
 const DEFAULT_CONFIG: AppConfig = {
     theme: 'system',
@@ -30,12 +30,15 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
     const [isLoaded, setIsLoaded] = useState(false);
+    /** Очередь сохранений: не даём более старым ответам перезаписать новые. */
+    const saveChain = useRef<Promise<unknown>>(Promise.resolve());
 
     const refresh = useCallback(async () => {
         try {
             const loaded = await tauriInvoke<AppConfig>('load_config');
             const merged = { ...DEFAULT_CONFIG, ...loaded };
             setTestModeActive(merged.testMode === true);
+            applyLanguage(merged.language);
             setConfig(merged);
         } catch (err) {
             console.error('Не удалось загрузить конфигурацию:', err);
@@ -50,10 +53,13 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     }, [refresh]);
 
     const saveConfig = useCallback(async (next: SaveConfigRequest, options?: { silent?: boolean }) => {
+        const request = saveChain.current.then(() => tauriInvoke<AppConfig>('save_config', { config: next }));
+        saveChain.current = request.catch(() => undefined);
         try {
-            const saved = await tauriInvoke<AppConfig>('save_config', { config: next });
+            const saved = await request;
             const merged = { ...DEFAULT_CONFIG, ...saved };
             setTestModeActive(merged.testMode === true);
+            applyLanguage(merged.language);
             setConfig(merged);
             if (!options?.silent) {
                 toast.success(t('settings.saveSuccess'), { id: 'config-save' });

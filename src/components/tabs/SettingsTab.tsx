@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Sun,
     Moon,
@@ -140,46 +141,56 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
 
     const [view, setView] = useState<SettingsView>('menu');
     const [draft, setDraft] = useState<SaveConfigRequest>({ ...config });
+    const [dirty, setDirty] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
     const [testResult, setTestResult] = useState<ConnectionTest | null>(null);
     const [testError, setTestError] = useState<string | null>(null);
     const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
     const [testModeBusy, setTestModeBusy] = useState(false);
-    const skipFirstSave = useRef(true);
+    /** Черновик на момент завершения save: отличает «сохранено всё» от «печатали дальше». */
+    const draftRef = useRef<SaveConfigRequest>(draft);
 
     useEffect(() => {
-        setDraft({ ...config });
-    }, [config]);
+        draftRef.current = draft;
+    }, [draft]);
+
+    // Внешнее изменение конфигурации (первая загрузка, другое окно) принимаем,
+    // только если в черновике нет несохранённых правок: иначе ответ save
+    // затирал символы, набранные за время запроса.
+    useEffect(() => {
+        if (!dirty) setDraft({ ...config });
+    }, [config, dirty]);
 
     const patch = (partial: Partial<SaveConfigRequest>) => {
         setDraft((prev) => ({ ...prev, ...partial }));
+        setDirty(true);
+    };
+
+    /** Схема LDAP: недописанный адрес не отправляем — это даёт ложные тосты. */
+    const hasCompleteLdapUrl = (value: string) => {
+        const url = value.trim();
+        return url === '' || /^ldaps?:\/\//i.test(url);
     };
 
     useEffect(() => {
-        if (skipFirstSave.current) {
-            skipFirstSave.current = false;
+        if (!dirty) return;
+        if (JSON.stringify(draft) === JSON.stringify(config)) {
+            setDirty(false);
             return;
         }
-        const sameAsConfig =
-            JSON.stringify(draft) ===
-            JSON.stringify({
-                theme: config.theme,
-                language: config.language,
-                ldapUrl: config.ldapUrl,
-                baseDn: config.baseDn,
-                useStartTls: config.useStartTls,
-                allowInvalidTls: config.allowInvalidTls,
-                auditEnabled: config.auditEnabled,
-                clipboardClearSeconds: config.clipboardClearSeconds,
-                testMode: config.testMode,
-            });
-        if (sameAsConfig) return;
+        if (!hasCompleteLdapUrl(draft.ldapUrl)) return;
         const timer = window.setTimeout(async () => {
             const saved = await saveConfig(draft, { silent: true });
-            if (saved) setAutoSavedAt(Date.now());
+            if (!saved) return;
+            setAutoSavedAt(Date.now());
+            // Пока шёл save, пользователь мог продолжить печатать: не сбрасываем
+            // dirty, если черновик уже ушёл от сохранённого снимка.
+            if (JSON.stringify(draftRef.current) === JSON.stringify(saved)) {
+                setDirty(false);
+            }
         }, 600);
         return () => window.clearTimeout(timer);
-    }, [draft, config, saveConfig]);
+    }, [draft, dirty, config, saveConfig]);
 
     /**
      * Тестовый режим применяется немедленно: конфигурация сохраняется,
@@ -206,12 +217,29 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
         setTestResult(null);
         setTestError(null);
         try {
+            // Проверяем именно то, что на экране: сохранение перед тестом
+            // фиксирует черновик, иначе команда читает старый config.json.
+            const saved = await saveConfig({ ...draftRef.current }, { silent: true });
+            if (!saved) {
+                setTestError(t('settings.saveError'));
+                return;
+            }
+            setDirty(false);
             const result = await tauriInvoke<ConnectionTest>('test_ldap_connection');
             setTestResult(result);
         } catch (err) {
             setTestError(toIpcError(err).message);
         } finally {
             setIsTesting(false);
+        }
+    };
+
+    /** Ручное открытие папки журнала: ошибка не должна теряться в консоли. */
+    const handleOpenAuditFolder = async () => {
+        try {
+            await system.openAuditFolder();
+        } catch (err) {
+            toast.error(toIpcError(err).message, { id: 'audit-folder-error' });
         }
     };
 
@@ -326,6 +354,14 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                 {t('settings.ad.hint')}
                             </p>
 
+                            <p className="text-[0.72rem] text-muted-foreground/80 font-medium leading-relaxed">
+                                {t('settings.ad.encryptedHint')}
+                            </p>
+
+                            <p className="text-[0.72rem] font-bold text-amber-600 dark:text-amber-400 leading-relaxed">
+                                {t('settings.ad.tlsRequiredHint')}
+                            </p>
+
                             <Field id="ldapUrl" label={t('settings.ad.ldapUrlLabel')}>
                                 <Input
                                     id="ldapUrl"
@@ -355,11 +391,11 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                             <div className="flex flex-col gap-4 pt-3 border-t border-border/60">
                                 <ToggleRow
                                     id="startTls"
-                                    checked={isLdaps ? false : draft.useStartTls}
-                                    onChange={(value) => patch({ useStartTls: value })}
+                                    checked={!isLdaps}
+                                    onChange={() => undefined}
                                     label={t('settings.ad.startTlsLabel')}
                                     hint={isLdaps ? t('settings.ad.startTlsLdapsNote') : t('settings.ad.startTlsHint')}
-                                    disabled={isLdaps}
+                                    disabled
                                 />
                                 <ToggleRow
                                     id="invalidTls"
@@ -382,6 +418,10 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                     {isTesting ? <Loader2 size={14} className="animate-spin" /> : <PlugZap size={14} />}
                                     {isTesting ? t('settings.ad.testingBtn') : t('settings.ad.testBtn')}
                                 </Button>
+
+                                <span className="text-[0.68rem] text-muted-foreground/70 font-medium text-center leading-snug">
+                                    {t('settings.ad.testHint')}
+                                </span>
 
                                 {testError && (
                                     <div className="w-full rounded-lg bg-red-500/[0.08] px-4 py-3 flex items-start gap-2.5">
@@ -470,7 +510,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                         <div className="w-full flex justify-center pt-3 border-t border-border/60">
                             <button
                                 type="button"
-                                onClick={() => void system.openAuditFolder()}
+                                onClick={() => void handleOpenAuditFolder()}
                                 className="inline-flex items-center gap-2 px-4 py-2 text-[0.68rem] font-bold uppercase tracking-tight text-muted-foreground hover:text-primary transition-colors bg-[#e6ebf2] dark:bg-white/[0.08] rounded-lg"
                             >
                                 <FolderOpen size={13} />
