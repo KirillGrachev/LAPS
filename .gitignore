@@ -2,9 +2,15 @@ node_modules/
 dist/
 coverage/
 .DS_Store
+Thumbs.db
 *.log
 .env*
 !.env.example
+.vite/
+
+# Editors
+.idea/
+.vscode/
 
 # Tauri/Rust
 src-tauri/target/
