@@ -13,21 +13,21 @@ import { toIpcError } from '../lib/ipc';
  * К переводу кода добавляются технические подробности, если бэкенд их передал.
  */
 export function useErrorHandler() {
-  const { t, language } = useTranslation();
+    const { t, language } = useTranslation();
 
-  const getMessage = (error: unknown): string => {
-    const ipcError = toIpcError(error);
-    if (language !== 'ru') {
-      const key = `errors.${ipcError.code}`;
-      const translated = t(key);
-      if (translated !== key) {
-        return ipcError.details && ipcError.details !== ipcError.message
-          ? `${translated} (${ipcError.details})`
-          : translated;
-      }
-    }
-    return ipcError.message || t('errors.UNKNOWN');
-  };
+    const getMessage = (error: unknown): string => {
+        const ipcError = toIpcError(error);
+        if (language !== 'ru') {
+            const key = `errors.${ipcError.code}`;
+            const translated = t(key);
+            if (translated !== key) {
+                return ipcError.details && ipcError.details !== ipcError.message
+                    ? `${translated} (${ipcError.details})`
+                    : translated;
+            }
+        }
+        return ipcError.message || t('errors.UNKNOWN');
+    };
 
-  return { getMessage };
+    return { getMessage };
 }
