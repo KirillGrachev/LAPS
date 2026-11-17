@@ -7,8 +7,8 @@ same section order as the GitHub releases and store the result as
 ```markdown
 ## Install
 
-Normal users: use `KMAruda LAPS_X.Y.Z_x64-setup.exe`. The
-`KMAruda LAPS_X.Y.Z_x64_ru-RU.msi` is the MSI payload for enterprise
+Normal users: use `KMAruda.LAPS_X.Y.Z_x64-setup.exe`. The
+`KMAruda.LAPS_X.Y.Z_x64_ru-RU.msi` is the MSI payload for enterprise
 deployment. The `KMAruda.LAPS_X.Y.Z_windows-x64_portable.zip` runs without
 installation. The WebView2 bootstrapper is embedded in the installer.
 

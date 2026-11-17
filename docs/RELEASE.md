@@ -41,8 +41,8 @@ The Cargo lockfile records the crate version too; run
 
 | Asset | Contents |
 | --- | --- |
-| `KMAruda LAPS_X.Y.Z_x64-setup.exe` | NSIS installer, per-user or per-machine, WebView2 bootstrapper |
-| `KMAruda LAPS_X.Y.Z_x64_ru-RU.msi` | MSI payload for enterprise deployment |
+| `KMAruda.LAPS_X.Y.Z_x64-setup.exe` | NSIS installer, per-user or per-machine, WebView2 bootstrapper |
+| `KMAruda.LAPS_X.Y.Z_x64_ru-RU.msi` | MSI payload for enterprise deployment |
 | `KMAruda.LAPS_X.Y.Z_windows-x64_portable.zip` | The executable without an installer |
 | `KMAruda.LAPS_X.Y.Z_windows-x64_symbols.zip` | PDB symbols for crash analysis |
 | `npm.cdx.json` | CycloneDX SBOM of the npm dependencies |
