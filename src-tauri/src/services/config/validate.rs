@@ -36,12 +36,13 @@ pub(super) fn validate_ldap_url(raw: &str) -> Result<String, AppError> {
     if url.is_empty() {
         return Ok(url);
     }
-    if !(url.starts_with("ldap://") || url.starts_with("ldaps://")) {
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("ldap://") || lower.starts_with("ldaps://")) {
         return Err(AppError::Validation(
             "Адрес сервера должен начинаться с ldap:// или ldaps:// (например, ldap://dc1.company.ru)".into(),
         ));
     }
-    let host_port = url
+    let host_port = lower
         .split_once("://")
         .map(|(_, rest)| rest)
         .unwrap_or_default()
@@ -58,7 +59,15 @@ pub(super) fn validate_ldap_url(raw: &str) -> Result<String, AppError> {
             "Адрес сервера содержит недопустимые символы".into(),
         ));
     }
-    Ok(url)
+    // Схема нормализуется к нижнему регистру: `LDAP://DC1` — валидный URL,
+    // и он не должен ломать `starts_with("ldap://")` ниже по коду.
+    let scheme = if lower.starts_with("ldaps://") {
+        "ldaps"
+    } else {
+        "ldap"
+    };
+    let rest = url.split_once("://").map(|(_, rest)| rest).unwrap_or("");
+    Ok(format!("{scheme}://{rest}"))
 }
 
 /// Проверяет Base DN: последовательность RDN `KEY=value`, разделённых запятыми.
@@ -90,12 +99,16 @@ pub(super) fn validate_base_dn(raw: &str) -> Result<String, AppError> {
 
 /// Полная валидация запроса сохранения.
 pub(super) fn validate_request(request: SaveConfigRequest) -> Result<SaveConfigRequest, AppError> {
+    let ldap_url = validate_ldap_url(&request.ldap_url)?;
+    // ldap:// без TLS не пропускаем: включаем StartTLS автоматически,
+    // чтобы старый конфиг не превратился в открытый канал.
+    let use_start_tls = request.use_start_tls || ldap_url.starts_with("ldap://");
     Ok(SaveConfigRequest {
         theme: normalize_theme(&request.theme),
         language: normalize_language(&request.language),
-        ldap_url: validate_ldap_url(&request.ldap_url)?,
+        ldap_url,
         base_dn: validate_base_dn(&request.base_dn)?,
-        use_start_tls: request.use_start_tls,
+        use_start_tls,
         allow_invalid_tls: request.allow_invalid_tls,
         audit_enabled: request.audit_enabled,
         clipboard_clear_seconds: normalize_clipboard_clear(request.clipboard_clear_seconds),
@@ -144,6 +157,16 @@ mod tests {
         );
         assert_eq!(
             validate_ldap_url("ldaps://dc1.company.ru:636").unwrap(),
+            "ldaps://dc1.company.ru:636"
+        );
+        // Схема в верхнем регистре нормализуется, а не отклоняется:
+        // placeholder в интерфейсе показывает LDAP:// — так вводят копипастом.
+        assert_eq!(
+            validate_ldap_url("LDAP://DC1.company.ru").unwrap(),
+            "ldap://DC1.company.ru"
+        );
+        assert_eq!(
+            validate_ldap_url("LDAPS://dc1.company.ru:636").unwrap(),
             "ldaps://dc1.company.ru:636"
         );
         assert!(validate_ldap_url("").is_ok());

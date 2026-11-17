@@ -39,17 +39,24 @@ pub async fn save_config(
             None => current_actor(true, None),
         }
     };
-    write_audit(
-        &state,
-        audit_enabled,
-        AuditLogger::event(
-            actor,
-            AuditAction::ConfigSaved,
-            saved.ldap_url.clone(),
-            "OK",
-        ),
-    )
-    .await;
+    let transport = if saved.ldap_url.starts_with("ldaps://") {
+        "ldaps"
+    } else if saved.use_start_tls {
+        "starttls"
+    } else {
+        "plain"
+    };
+    let mut event = AuditLogger::event(
+        actor,
+        AuditAction::ConfigSaved,
+        saved.ldap_url.clone(),
+        "OK",
+    );
+    event.details = Some(format!(
+        "transport={transport}, verify_cert={}",
+        !saved.allow_invalid_tls
+    ));
+    write_audit(&state, audit_enabled, event).await;
     Ok(saved)
 }
 

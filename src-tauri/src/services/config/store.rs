@@ -40,7 +40,16 @@ impl ConfigStore {
             return AppConfig::default();
         };
         match serde_json::from_str::<AppConfig>(&content) {
-            Ok(config) => config,
+            Ok(mut config) => {
+                // Безопасное значение по умолчанию: ldap:// всегда через
+                // StartTLS, даже если в старом конфиге флаг был выключен.
+                // Схема может быть записана в верхнем регистре — сравниваем
+                // без учёта регистра.
+                if config.ldap_url.to_ascii_lowercase().starts_with("ldap://") {
+                    config.use_start_tls = true;
+                }
+                config
+            }
             Err(e) => {
                 warn!(error = %e, "config.json повреждён, делаю резервную копию и использую значения по умолчанию");
                 let backup = path.with_extension("json.corrupt");
@@ -51,7 +60,7 @@ impl ConfigStore {
     }
 
     /// Валидация и атомарное сохранение конфигурации.
-    /// Возвращает сохранённую конфигурацию (с актуальным `hasPassword`).
+    /// Возвращает нормализованную сохранённую конфигурацию.
     pub fn save(dir: &Path, request: SaveConfigRequest) -> Result<AppConfig, AppError> {
         let path = Self::config_path(dir);
         let request = validate_request(request)?;
@@ -112,10 +121,34 @@ mod tests {
 
         let saved = ConfigStore::save(&dir, request()).expect("save");
         assert_eq!(saved.ldap_url, "ldap://dc1.company.ru");
+        // ldap:// автоматически переводится на StartTLS.
+        assert!(saved.use_start_tls);
 
         let loaded = ConfigStore::load(&dir).expect("load");
         assert_eq!(loaded.theme, "dark");
         assert_eq!(loaded.base_dn, "DC=company,DC=ru");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    /// Повторное сохранение перезаписывает существующий файл (атомарный
+    /// temp+rename), а не падает с «file exists».
+    fn overwrites_existing_config() {
+        let dir =
+            std::env::temp_dir().join(format!("kmaruda-laps-overwrite-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        ConfigStore::save(&dir, request()).expect("первое сохранение");
+        let mut second = request();
+        second.ldap_url = "ldaps://dc2.company.ru".into();
+        second.theme = "light".into();
+        ConfigStore::save(&dir, second).expect("перезапись");
+
+        let loaded = ConfigStore::load(&dir).expect("load");
+        assert_eq!(loaded.ldap_url, "ldaps://dc2.company.ru");
+        assert_eq!(loaded.theme, "light");
 
         let _ = fs::remove_dir_all(&dir);
     }

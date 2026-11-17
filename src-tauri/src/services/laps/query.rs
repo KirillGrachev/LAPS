@@ -28,6 +28,20 @@ pub enum ComputerQuery {
     Fqdn(String),
 }
 
+/// Асинхронная версия для команд: обратный DNS (`GetNameInfoW`) — блокирующий
+/// вызов, поэтому уводим его в `spawn_blocking`, а не занимаем async-воркер.
+pub async fn parse_query_async(raw: &str) -> Result<ComputerQuery, AppError> {
+    let query = raw.trim();
+    if let Ok(ip) = query.parse::<std::net::IpAddr>() {
+        let name = tauri::async_runtime::spawn_blocking(move || reverse_dns(&ip))
+            .await
+            .map_err(|error| AppError::Internal(format!("обратный DNS: {error}")))??;
+        debug!(ip = %ip, resolved = %name, "IP разрешён в имя обратным DNS");
+        return classify_name(&name);
+    }
+    parse_query(raw)
+}
+
 /// Классифицирует и валидирует пользовательский ввод.
 /// IP-адрес — в имя (обратный DNS), далее как обычный запрос.
 pub fn parse_query(raw: &str) -> Result<ComputerQuery, AppError> {

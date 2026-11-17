@@ -43,7 +43,8 @@ pub async fn search_computer(
                 info.flavor,
                 crate::services::laps::LapsFlavor::WindowsEncrypted
             ) {
-                event.details = Some("decrypt=unavailable".to_string());
+                let reason = info.decrypt_error.as_deref().unwrap_or("unknown");
+                event.details = Some(truncate_details(&format!("decrypt=unavailable: {reason}")));
             }
             write_audit(&state, audit_enabled, event).await;
         }
@@ -64,8 +65,9 @@ pub async fn search_computer(
 /// Сброс («сменить сейчас») или продление срока истечения пароля LAPS.
 ///
 /// * `dn` — DN объекта компьютера из результата `search_computer`;
-/// * `mode` — `"now"` (удалить срок → агент сгенерирует новый пароль при
-///   следующем применении политики) или `"at"` (записать конкретную дату);
+/// * `mode` — `"now"` (записать текущий момент: срок уже наступил, агент
+///   сменит пароль при следующем применении политики) или `"at"` (записать
+///   конкретную дату);
 /// * `localDateTime` — для режима `"at"`: наивная локальная строка
 ///   `YYYY-MM-DDTHH:MM[:SS]` из datetime-пикера.
 #[tauri::command(rename_all = "camelCase")]

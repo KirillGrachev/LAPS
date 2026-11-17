@@ -1,18 +1,18 @@
 [package]
 name = "kmaruda-laps"
-version = "2.0.0"
+version = "2.1.0"
 description = "KMAruda LAPS — чтение паролей локальных администраторов (LAPS) из Active Directory. Нативный LDAP-клиент, без PowerShell и RSAT."
 authors = ["KMAruda Development Team"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.90"
 
 [lib]
 name = "app_lib"
 crate-type = ["cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.2" }
+tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
 tauri = { version = "2.11.2", features = [] }
@@ -33,8 +33,6 @@ ldap3 = "0.11"
 
 # Gzip-архивация журнала аудита прошлых запусков (pure Rust, без OpenSSL).
 flate2 = "1"
-# Base64 для -EncodedCommand запасного уровня дешифровки LAPS.
-base64 = "0.22"
 
 # Дата/время: FILETIME AD (100-нс интервалы с 1601 г.) <-> RFC 3339,
 # локальный часовой пояс для отображения сроков действия паролей.
@@ -61,7 +59,9 @@ windows-core = "0.62"
 windows = { version = "0.61.3", features = [
     "Win32_Foundation",
     "Win32_Security_Cryptography",
+    "Win32_System_LibraryLoader",
     "Win32_System_Registry",
+    "Win32_System_SystemInformation",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }

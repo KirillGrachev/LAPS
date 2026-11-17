@@ -1,7 +1,7 @@
 //! Модель конфигурации: подключение к AD, интерфейс, аудит.
 //!
-//! Пароль bind-учётки в модели не живёт: вместо него флаг `hasPassword` —
-//! секрет остаётся в системном хранилище (см. [`super::store::ConfigStore`]).
+//! Секретов в модели нет: пароль входа хранится только в памяти сессии
+//! (`Zeroizing<String>`), а конфигурация — обычный JSON без учётных данных.
 
 use serde::{Deserialize, Serialize};
 
@@ -23,8 +23,8 @@ const fn default_clipboard_clear() -> u32 {
 
 /// Конфигурация приложения (одна организация / один домен).
 ///
-/// Эта структура одновременно описывает контракт фронтенда: вместо пароля
-/// в ней флаг `hasPassword` — секрет не покидает keyring.
+/// Эта структура одновременно описывает контракт фронтенда. Учётных
+/// данных в ней нет by design.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
@@ -82,8 +82,8 @@ impl Default for AppConfig {
     }
 }
 
-/// Входные данные сохранения конфигурации (без пароля — он передаётся
-/// отдельной командой `set_ldap_password`).
+/// Входные данные сохранения конфигурации. Секретов здесь нет: пароль
+/// живёт только в памяти сессии и передаётся команде `login`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveConfigRequest {

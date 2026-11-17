@@ -307,6 +307,9 @@ impl AuditLogger {
         }
         writeln!(file, "{}", format_line(event))
             .map_err(|e| AppError::Audit(format!("не удалось записать в {LOG_FILE}: {e}")))?;
+        // Аудит должен переживать аварийное завершение процесса.
+        file.sync_data()
+            .map_err(|e| AppError::Audit(format!("не удалось сбросить {LOG_FILE} на диск: {e}")))?;
         Ok(())
     }
 
