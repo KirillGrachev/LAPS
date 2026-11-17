@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { LapsInfo } from '../types';
+import { useSession } from './SessionContext';
 
 interface SearchContextType {
     isSearching: boolean;
@@ -26,6 +27,29 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     const [result, setResult] = useState<LapsInfo | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [lastSearchQuery, setLastSearchQuery] = useState('');
+    const { session, checking } = useSession();
+
+    /**
+     * Выход/истечение сессии: пароль не должен переживать logout.
+     * `checking` защищает от очистки на старте, пока статус ещё неизвестен.
+     */
+    useEffect(() => {
+        if (checking || session) return;
+        const password = result?.password;
+        if (password) {
+            void (async () => {
+                try {
+                    const current = await navigator.clipboard.readText();
+                    if (current === password) await navigator.clipboard.writeText('');
+                } catch {
+                    // Clipboard может быть недоступен — это best effort.
+                }
+            })();
+        }
+        setResult(null);
+        setError(null);
+        setLastSearchQuery('');
+    }, [checking, session, result?.password]);
 
     return (
         <SearchContext.Provider

@@ -10,7 +10,7 @@ import { tauriInvoke } from './ipc';
 
 export const system = {
     isTauri: () => {
-        /** @ts-ignore */
+        /** @ts-expect-error __TAURI_INTERNALS__ появляется только в Tauri-хосте */
         return typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
     },
 

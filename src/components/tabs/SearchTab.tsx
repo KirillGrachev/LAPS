@@ -13,6 +13,7 @@ export function SearchTab() {
         rotationKind,
         result,
         lastSearchQuery,
+        error,
         handleSearch,
         handleRotate,
         copyPassword,
@@ -32,11 +33,17 @@ export function SearchTab() {
                     translate={t}
                 />
 
+                {error && (
+                    <div className="w-full rounded-lg bg-red-500/[0.07] px-4 py-2.5 text-center text-[0.78rem] font-bold text-red-500">
+                        {error}
+                    </div>
+                )}
+
                 {result && (
                     <div className="w-full h-[1px] bg-border dark:bg-white/10 max-w-[120px] sm:max-w-xs md:max-w-md mx-auto transition-colors" />
                 )}
 
-                <PasswordResult result={result} copyPassword={() => void copyPassword()} />
+                <PasswordResult result={result} copyPassword={copyPassword} />
 
                 <ExpirationForm
                     result={result}
