@@ -199,7 +199,8 @@ scan, CodeQL, dependency review and OSV. Details: [docs/TESTING.md](docs/TESTING
 
 ## Contributing and support
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request; all
+participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
 Use [SUPPORT.md](SUPPORT.md) for questions and [SECURITY.md](SECURITY.md) for
 vulnerabilities — never a public issue with a password or a domain name.
 
