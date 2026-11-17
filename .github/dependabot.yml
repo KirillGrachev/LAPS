@@ -9,6 +9,12 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: deps(frontend)
+    # Major frontend upgrades (Vite, Vitest, ESLint, React, i18next, motion)
+    # need a deliberate migration and a UI regression pass; they are tracked
+    # manually, not in the weekly grouped PR.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       frontend:
         patterns:
@@ -22,6 +28,23 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: deps(rust)
+    ignore:
+      # Pinned to the wry/webview2-com 0.39 stack: the COM cast trait must be
+      # the same windows-core instance, see the comment in Cargo.toml.
+      - dependency-name: windows-core
+      - dependency-name: webview2-com
+      # 0.x minor bumps are breaking for these crates, so block minor too.
+      - dependency-name: windows
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
+      - dependency-name: ldap3
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
+      # Tauri 3 is a migration, not a weekly bump.
+      - dependency-name: tauri
+        update-types: ['version-update:semver-major']
+      - dependency-name: tauri-build
+        update-types: ['version-update:semver-major']
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       rust:
         patterns:
