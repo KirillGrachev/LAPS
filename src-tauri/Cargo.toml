@@ -22,14 +22,14 @@ tauri-plugin-opener = "2"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-thiserror = "1"
+thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 
 # Нативный LDAP-клиент: запросы к AD выполняются напрямую из Rust,
 # без PowerShell, RSAT и модуля LAPS (архитектура — как в kmaruda-phonebook).
-ldap3 = "0.11"
+ldap3 = "0.12"
 
 # Gzip-архивация журнала аудита прошлых запусков (pure Rust, без OpenSSL).
 flate2 = "1"
@@ -55,8 +55,8 @@ webview2-com = "0.39.1"
 # Trait `Interface` (метод .cast()) той же версии windows-core, на которой
 # собран webview2-com-sys 0.39 (windows-core 0.62). Отдельная зависимость:
 # crate `windows` ниже остаётся на 0.61 для реестровых API (webview_prereq).
-windows-core = "0.62"
-windows = { version = "0.61.3", features = [
+windows-core = "0.100"
+windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_Security_Cryptography",
     "Win32_System_LibraryLoader",
