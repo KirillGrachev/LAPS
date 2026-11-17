@@ -58,6 +58,11 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: deps(ci)
+    # Major action releases (upload-artifact v7, download-artifact v8) need a
+    # workflow migration and a green run; patch/minor updates stay automatic.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       actions:
         patterns:
