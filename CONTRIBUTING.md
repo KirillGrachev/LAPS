@@ -7,6 +7,7 @@ checks a pull request must pass.
 
 - Read [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - For a security issue, follow [SECURITY.md](SECURITY.md), not a public issue.
+- By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 - The project is a native Windows client: PowerShell, RSAT and the
   `ActiveDirectory` module are not acceptable dependencies.
 
