@@ -24,7 +24,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
         const root = window.document.documentElement;
         const updateTheme = () => {
-            let currentResolved: 'light' | 'dark' = 'light';
+            let currentResolved: 'light' | 'dark';
 
             if (theme === 'system') {
                 currentResolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
