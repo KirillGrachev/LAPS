@@ -3,16 +3,16 @@
 //! Механика обоих поколений LAPS одинакова: агент на компьютере при
 //! очередном применении политики сравнивает срок истечения с текущим
 //! временем и генерирует новый пароль, если срок наступил. Поэтому:
-//! * **«Сбросить сейчас»** — записываем в атрибут **текущий** FILETIME
+//! * **«Сбросить сейчас»** - записываем в атрибут **текущий** FILETIME
 //!   (поведение Microsoft-командлета `Set-LapsADPasswordExpirationTime`
 //!   без `-WhenEffective`: срок наступает немедленно). Удалять атрибут
 //!   нельзя: агент не обязан трактовать отсутствие значения как
 //!   «истёк», а часть контроллеров домена запрещает удаление;
-//! * **«Продлить/изменить срок»** — пишем новый FILETIME в атрибут.
+//! * **«Продлить/изменить срок»** - пишем новый FILETIME в атрибут.
 //!
 //! Атрибуты, в которые умеем писать:
-//! * legacy LAPS — `ms-Mcs-AdmPwdExpirationTime`;
-//! * Windows LAPS — `msLAPS-PasswordExpirationTime`.
+//! * legacy LAPS - `ms-Mcs-AdmPwdExpirationTime`;
+//! * Windows LAPS - `msLAPS-PasswordExpirationTime`.
 //!
 //! В смешанном домене (присутствуют оба) обновляются оба, чтобы агенты
 //! любого поколения увидели согласованное значение.
@@ -54,7 +54,7 @@ const WRITABLE_LEGACY_EXPIRATION: &str = "ms-Mcs-AdmPwdExpirationTime";
 
 /// Строит набор модификаций для сброса/продления срока по текущему
 /// состоянию объекта (какие атрибуты физически присутствуют).
-/// Точный источник правды — признак rotation_possible из парсера
+/// Точный источник правды - признак rotation_possible из парсера
 /// (вычисляется по фактическому наличию атрибутов срока).
 /// Разумность: не раньше 2000 года и не позже +10 лет.
 pub fn build_rotation_mods(
@@ -80,14 +80,14 @@ pub fn build_rotation_mods(
     }
 
     let mods = match mode {
-        // Сброс — это «срок наступил сейчас», а не удаление атрибута:
+        // Сброс - это «срок наступил сейчас», а не удаление атрибута:
         // ровно так работает Set-LapsADPasswordExpirationTime без
         // -WhenEffective. Агент увидит истёкший срок на следующем цикле.
         RotationMode::Now => replace_targets(targets, time::now_filetime()),
         RotationMode::At(local) => {
             let filetime = time::parse_local_naive_to_filetime(local).ok_or_else(|| {
                 AppError::Validation(format!(
-                    "Некорректная дата/время: {local:?}. Ожидается формат ГГГГ-ММ-ДДTЧЧ:ММ."
+                    "Некорректная дата/время: {local:?}; ожидается формат ГГГГ-ММ-ДДTЧЧ:ММ"
                 ))
             })?;
             let now = time::now_filetime();
@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    /// «Сбросить сейчас» — Replace с текущим FILETIME, а не Delete:
+    /// «Сбросить сейчас» - Replace с текущим FILETIME, а не Delete:
     /// отсутствие атрибута не означает «срок истёк».
     fn now_mode_writes_current_filetime() {
         let before = time::now_filetime();

@@ -1,9 +1,9 @@
 /**
  * Контракты IPC между фронтендом и Rust-бэкендом.
  *
- * Имена полей — camelCase (Rust-структуры сериализуются с
+ * Имена полей - camelCase (Rust-структуры сериализуются с
  * `#[serde(rename_all = "camelCase")]`). Держим синхронно с
- * `src-tauri/src/services/**` — любое изменение контракта на бэкенде
+ * `src-tauri/src/services/**` - любое изменение контракта на бэкенде
  * обязано отражаться здесь.
  */
 
@@ -19,13 +19,13 @@ export interface AppConfig {
     language: Language;
     /** Адрес контроллера домена: `ldap://dc1.company.ru` / `ldaps://...`. */
     ldapUrl: string;
-    /** Корень поиска; пусто — берётся `defaultNamingContext` из rootDSE. */
+    /** Корень поиска; пусто - берётся `defaultNamingContext` из rootDSE. */
     baseDn: string;
     useStartTls: boolean;
     /** Не проверять сертификат TLS (внутренние CA). */
     allowInvalidTls: boolean;
     auditEnabled: boolean;
-    /** Автоочистка буфера обмена после копирования пароля, сек (0 — выключена). */
+    /** Автоочистка буфера обмена после копирования пароля, сек (0 - выключена). */
     clipboardClearSeconds: number;
     /** Тестовый режим: демо-данные вместо запросов к Active Directory. */
     testMode: boolean;
@@ -50,7 +50,7 @@ export interface LapsInfo {
     password: string | null;
     /** Момент последнего обновления пароля, RFC 3339 (локальное время). */
     updatedAt: string | null;
-    /** Срок истечения пароля, RFC 3339 (локальное время); `null` — сброшен/не задан. */
+    /** Срок истечения пароля, RFC 3339 (локальное время); `null` - сброшен/не задан. */
     expiresAt: string | null;
     /** Пароль получен расшифровкой msLAPS-EncryptedPassword (KDS/DPAPI-NG). */
     decrypted: boolean;

@@ -4,6 +4,58 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-11-26
+
+### Added
+
+- Native clipboard through `arboard`: the WebView no longer asks for clipboard
+  permission, and auto-clear compares the value in Rust
+  (`clear_clipboard_if_equals`) instead of reading arbitrary clipboard content.
+- Custom window state (`window.json`): size, position and maximized state are
+  restored before the window is shown; a position on a disconnected monitor is
+  ignored and the window is centered.
+- Data directory moved to `%APPDATA%\KMAruda LAPS`; existing 2.1 data is
+  migrated once (rename, or copy into a staging directory and rename).
+- Encrypted LAPS: DER scan for definite and indefinite-length CMS, diagnostics
+  for every candidate and flag combination, a second `LogonUser(INTERACTIVE)`
+  token for explicit sign-in, and domain inference from the Base DN or LDAP URL
+  for short account names.
+- Unified `text-ui-*` typography scale, a compact settings layout, native
+  dependency checks before dev/build, and smoother dialogs, menus and login
+  elements.
+
+### Changed
+
+- `chrono` is replaced by `time`; `rustix`, `url` and `tokio` are updated, and a
+  RustSec audit job plus `src-tauri/.cargo/audit.toml` document the ignored
+  Linux-only advisories.
+- Saving an unchanged configuration no longer appends a duplicate audit record;
+  the audit folder opens even when `audit.log` does not exist yet.
+- `tauri-plugin-window-state` is removed in favour of the in-process store.
+- DWM window transitions are disabled; the minimum window height is 680 px.
+- The StartTLS switch is removed from Settings: `ldap://` always uses StartTLS,
+  `ldaps://` does not need it.
+
+### Fixed
+
+- Local rotation deadlines around DST are resolved by round-tripping the offset;
+  nonexistent and ambiguous local times are rejected instead of writing a wrong
+  deadline.
+- A failed data migration no longer leaves a partial data directory that blocks
+  the next attempt.
+- The test-mode toggle is audited again; only exact duplicate saves are skipped.
+- The UI language is applied on start-up, the settings draft is not overwritten
+  by its own autosave, and late search/rotation responses cannot restore a
+  cleared password card.
+- The audit page de-duplicates boundary rows and ignores stale responses; the
+  demo journal is marked, and failed mock operations are recorded.
+
+### Security
+
+- Clipboard writes are session-gated; the WebView cannot read arbitrary
+  clipboard content, only clear it when it still holds the copied password.
+- LDAP URL schemes are case-insensitive and normalized before a connection.
+
 ## [2.1.0] - 2026-11-17
 
 ### Added
@@ -79,5 +131,6 @@ All notable changes to this project are documented here. The format follows
   local audit and a Russian/English interface. The AD layer used PowerShell
   scripts and the system LAPS module.
 
+[2.2.0]: https://github.com/KirillGrachev/LAPS/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/KirillGrachev/LAPS/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/KirillGrachev/LAPS/releases/tag/v2.0.0

@@ -20,17 +20,30 @@ pub async fn list_audit(
     run_blocking(move || logger.list(limit, offset)).await
 }
 
-/// Показывает файл журнала в системном проводнике.
+/// Открывает папку журнала в системном проводнике.
+///
+/// Если файла `audit.log` ещё нет, всё равно открываем каталог данных:
+/// кнопка «Папка журнала» не должна молча ничего не делать.
 #[tauri::command]
 pub async fn open_audit_folder(app: AppHandle) -> Result<(), AppError> {
     let state = app.state::<AppState>();
     let path = state.audit.log_path();
-    if !path.exists() {
-        return Err(AppError::NotFound(
-            "Журнал аудита ещё не создан: выполните хотя бы одну операцию поиска".into(),
-        ));
-    }
-    app.opener()
-        .reveal_item_in_dir(&path)
-        .map_err(|e| AppError::Internal(format!("не удалось открыть папку журнала: {e}")))
+    let dir = path
+        .parent()
+        .ok_or_else(|| AppError::Internal("у журнала нет родительского каталога".into()))?;
+
+    std::fs::create_dir_all(dir)
+        .map_err(|e| AppError::Internal(format!("не удалось создать папку журнала: {e}")))?;
+
+    let opener = app.opener();
+    let dir_text = dir.to_string_lossy().into_owned();
+    let result = if path.exists() {
+        opener
+            .reveal_item_in_dir(&path)
+            .or_else(|_| opener.open_path(dir_text.clone(), None::<String>))
+    } else {
+        opener.open_path(dir_text, None::<String>)
+    };
+
+    result.map_err(|e| AppError::Internal(format!("не удалось открыть папку журнала: {e}")))
 }

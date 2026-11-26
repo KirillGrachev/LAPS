@@ -1,7 +1,7 @@
 //! Модель конфигурации: подключение к AD, интерфейс, аудит.
 //!
 //! Секретов в модели нет: пароль входа хранится только в памяти сессии
-//! (`Zeroizing<String>`), а конфигурация — обычный JSON без учётных данных.
+//! (`Zeroizing<String>`), а конфигурация - обычный JSON без учётных данных.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,11 +36,11 @@ pub struct AppConfig {
     pub language: String,
 
     /// Адрес контроллера домена: `ldap://dc1.company.ru` или `ldaps://...`.
-    /// Пустая строка — автообнаружение через rootDSE невозможно, потребуется
+    /// Пустая строка - автообнаружение через rootDSE невозможно, потребуется
     /// заполнить (приложение не выполняет DC Locator, как PS-модуль AD).
     #[serde(default)]
     pub ldap_url: String,
-    /// Корень поиска: `DC=company,DC=ru`. Пустой — берётся
+    /// Корень поиска: `DC=company,DC=ru`. Пустой - берётся
     /// `defaultNamingContext` из rootDSE.
     #[serde(default)]
     pub base_dn: String,
@@ -48,14 +48,14 @@ pub struct AppConfig {
     #[serde(default)]
     pub use_start_tls: bool,
     /// Не проверять сертификат сервера (внутренние CA с самоподписанными
-    /// сертификатами). Понижает безопасность — в UI помечается как опасная.
+    /// сертификатами). Понижает безопасность - в UI помечается как опасная.
     #[serde(default)]
     pub allow_invalid_tls: bool,
     /// Локальный журнал аудита операций с паролями LAPS.
     #[serde(default = "default_true")]
     pub audit_enabled: bool,
     /// Автоочистка буфера обмена через N секунд после копирования пароля
-    /// (0 — не очищать).
+    /// (0 - не очищать).
     #[serde(default = "default_clipboard_clear")]
     pub clipboard_clear_seconds: u32,
     /// Тестовый режим: доменные команды (вход, поиск, ротация, журнал)
@@ -82,8 +82,8 @@ impl Default for AppConfig {
     }
 }
 
-/// Входные данные сохранения конфигурации. Секретов здесь нет: пароль
-/// живёт только в памяти сессии и передаётся команде `login`.
+/// Входные данные сохранения конфигурации (без пароля - он передаётся
+/// отдельной командой `set_ldap_password`).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveConfigRequest {
@@ -115,7 +115,7 @@ pub struct ConnectionTest {
     pub bind_ms: u64,
     /// `dnsHostName` из rootDSE.
     pub server_dns_name: Option<String>,
-    /// `defaultNamingContext` из rootDSE — подсказка для Base DN.
+    /// `defaultNamingContext` из rootDSE - подсказка для Base DN.
     pub default_naming_context: Option<String>,
     /// Режим аутентификации, использованный при проверке:
     /// `integrated` | `account` | `anonymous`.

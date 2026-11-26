@@ -7,9 +7,10 @@ and no remote service other than the Active Directory controller you configure.
 
 | Data | Location | Contains secrets |
 | --- | --- | --- |
-| Configuration | `%APPDATA%\com.kmaruda.laps\config.json` | No |
-| Audit journal | `%APPDATA%\com.kmaruda.laps\audit.log` | No password fields |
-| Archived journals | `%APPDATA%\com.kmaruda.laps\audit-*.log.gz` | No password fields |
+| Configuration | `%APPDATA%\KMAruda LAPS\config.json` | No |
+| Audit journal | `%APPDATA%\KMAruda LAPS\audit.log` | No password fields |
+| Archived journals | `%APPDATA%\KMAruda LAPS\audit-*.log.gz` | No password fields |
+| Window state | `%APPDATA%\KMAruda LAPS\window.json` | No |
 
 The configuration holds the LDAP URL, Base DN, theme, language, TLS and audit
 preferences. The audit journal holds the timestamp, action, result code,
@@ -30,8 +31,8 @@ The sign-in password is kept in `Zeroizing<String>` and wiped at logout and
 exit. The decrypted LAPS password exists in Rust memory, in the IPC payload, in
 React state and in the clipboard while the operator uses it. The OS may page or
 dump process memory; the app does not attempt to lock pages or block debuggers.
-The clipboard is cleared after the configured timeout when the WebView can still
-access it; the failure mode is reported in the UI.
+Clipboard writes and the conditional auto-clear go through Rust, so the WebView
+never reads arbitrary clipboard content; a failed cleanup is reported in the UI.
 
 ## Test mode
 
@@ -42,7 +43,7 @@ production workstation.
 
 ## Deletion
 
-Remove `%APPDATA%\com.kmaruda.laps` to delete the configuration and the whole
+Remove `%APPDATA%\KMAruda LAPS` to delete the configuration and the whole
 audit history. Uninstalling the application removes the program files; the
 data directory is intentionally left in place so an upgrade or reinstall keeps
 the settings.

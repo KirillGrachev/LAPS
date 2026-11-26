@@ -32,9 +32,9 @@ in [ADMIN](ADMIN.md), [BUILD](BUILD.md) and [TROUBLESHOOTING](TROUBLESHOOTING.md
 ```
 
 One process, no sidecars and no local HTTP service. The only network protocol
-is LDAP; the only OS integration is Win32 (LDAP TLS through `ldap3`, DPAPI-NG
-through `lapsutil.dll`/CNG, the registry for the WebView2 preflight, the
-clipboard through the WebView).
+is LDAP; OS integration is Win32 (LDAP TLS through `ldap3`, DPAPI-NG through
+`lapsutil.dll`/CNG, the registry for the WebView2 preflight, the clipboard
+through `arboard`).
 
 ## Layers and boundaries
 
@@ -88,18 +88,23 @@ itself is never persisted and never crosses the IPC boundary.
   mismatch, and diagnostics never include a password.
 - `decrypt.rs` (Windows) loads `lapsutil.dll` by full path from
   `%WindowsDir%\System32\WindowsPowerShell\v1.0\Modules\LAPS\`, resolves
-  `DecryptNormalMode` and `LogonWithCredentials`, creates a token for an
-  explicit sign-in, decrypts, parses the UTF-16LE JSON, zeroizes the output
-  buffer and frees it with `LocalFree`. SSO falls back to
-  `NCryptUnprotectSecret`; an explicit sign-in never falls back, so the
-  password cannot be decrypted under an identity the operator did not choose.
+  `DecryptNormalMode` and `LogonWithCredentials`, creates a network token for an
+  explicit sign-in (and a full `LogonUser(INTERACTIVE)` token only if the first
+  one is not accepted), decrypts, parses the UTF-16LE JSON, zeroizes the output
+  buffer and frees it with `LocalFree`. Each candidate is tried with
+  `flags=0` and `0x20000000` because the export is undocumented. A short account
+  name gets its domain from the Base DN or LDAP URL before the Windows session.
+  SSO falls back to `NCryptUnprotectSecret`; an explicit sign-in never falls
+  back, so the password cannot be decrypted under an identity the operator did
+  not choose.
 - `expiration.rs` builds LDAP `Replace` modifications. "Now" writes the current
   FILETIME (the same effective behaviour as
   `Set-LapsADPasswordExpirationTime` without `-WhenEffective`); an explicit date
   is validated to 2000..now+10 years. Mixed domains get both expiration
   attributes.
-- `time.rs` converts FILETIME (100 ns since 1601) to local RFC 3339 and back,
-  including DST handling.
+- `time.rs` converts FILETIME (100 ns since 1601) to local RFC 3339 and back.
+  Local times are resolved by round-tripping the offset; nonexistent and
+  ambiguous DST moments are rejected instead of writing a wrong deadline.
 
 ### Configuration (`services/config/`)
 
@@ -110,7 +115,15 @@ password is entered at every launch and lives only in the session.
 `ConfigStore::save` validates and normalizes input, then writes
 `config.json` atomically (temp file + rename). A corrupt file is moved to
 `config.json.corrupt` and defaults are used. `ldap://` URLs are normalized to a
-lower-case scheme with StartTLS forced.
+lower-case scheme with StartTLS forced. The configuration, the audit journal and
+`window.json` live in `%APPDATA%\KMAruda LAPS`; data from the older
+`com.kmaruda.laps` directory is migrated once (rename, or copy into a staging
+directory and rename when the directories are on different volumes). A save
+with an unchanged configuration does not append a duplicate audit record.
+
+Window size, position and maximized state are stored by `window_state.rs` and
+restored before the window is shown. A position that no longer intersects any
+available monitor is ignored and the window is centered.
 
 ### Audit (`services/audit.rs`)
 

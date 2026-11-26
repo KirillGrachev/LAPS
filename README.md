@@ -21,7 +21,7 @@
 ---
 
 > [!NOTE]
-> **Status: 2.1.0.** The native LDAP path, password rotation, audit journal and
+> **Status: 2.2.0.** The native LDAP path, password rotation, audit journal and
 > encrypted Windows LAPS decryption are implemented and covered by unit tests.
 > Actual KDS decryption has not been verified against a live domain in CI:
 > run the checklist in [docs/TESTING.md](docs/TESTING.md) in your own domain
@@ -85,6 +85,10 @@ ZIP runs without installation. The installer bundles the WebView2 bootstrapper
 and does not contain any PowerShell or `.ps1` payload; the only NSIS hook closes
 a running instance before an upgrade.
 
+Data lives in `%APPDATA%\KMAruda LAPS` (configuration, audit journal and window
+state). Settings and the audit journal from 2.1 are migrated automatically on
+the first launch of 2.2.
+
 First run:
 
 1. Open **Settings → Active Directory** and enter the LDAP URL, for example
@@ -132,7 +136,9 @@ exact Win32/HRESULT diagnostic while expiration management keeps working.
   LDAP is rejected. Certificate verification is on unless explicitly disabled.
 - The decrypted API buffer is zeroized before it is freed. The password is then
   held in IPC payloads, React state and the clipboard, which the app does not
-  control.
+  control. Clipboard access goes through Rust (`arboard`): the WebView never
+  reads arbitrary clipboard content, and the auto-clear compares the value in
+  the backend.
 - Password fields never enter the audit journal; details carry the operation
   mode, error codes and diagnostics. The journal is local plain text, editable
   by a local administrator, and is not tamper-evident.

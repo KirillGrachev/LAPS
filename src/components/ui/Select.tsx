@@ -25,9 +25,9 @@ const MAX_ROWS = 5;
  * Кастомный выпадающий список в стиле приложения.
  *
  * Нативный `<select>` в WebView2 рисует ОС-попап, чуждый интерфейсу
- * продукта; здесь список — popover с токенами темы. Рендерится через
+ * продукта; здесь список - popover с токенами темы. Рендерится через
  * portal с `position: fixed`, шириной по якорю, клампом по краям окна
- * и флипом вверх — не растягивает скролл и не выходит за форму приложения.
+ * и флипом вверх - не растягивает скролл и не выходит за форму приложения.
  * Шеврон отстоит от края поля на 12px, значение и пункты центрированы.
  */
 export function Select<T extends string | number>({
@@ -76,12 +76,12 @@ export function Select<T extends string | number>({
                 aria-expanded={open}
                 disabled={disabled}
                 onClick={() => setOpen((v) => !v)}
-                className="relative w-full h-[42px] rounded-lg border-none bg-[#e6ebf2] dark:bg-white/[0.08] pl-4 pr-10 text-center text-[0.82rem] font-black text-foreground transition-colors hover:bg-[#dde4ed] dark:hover:bg-white/[0.13] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                className="relative w-full h-[42px] rounded-[10px] border border-border bg-[#e2e8f0] dark:bg-white/[0.08] pl-4 pr-10 text-center text-ui-md font-semibold text-foreground transition-colors focus:border-foreground/30 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             >
-                <span className="block truncate">{selected?.label ?? '—'}</span>
+                <span className="block truncate">{selected?.label ?? ''}</span>
                 <ChevronDown
                     size={15}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground opacity-70 pointer-events-none transition-transform ${
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground opacity-70 pointer-events-none transition-transform duration-200 ${
                         open ? 'rotate-180' : ''
                     }`}
                 />
@@ -99,7 +99,7 @@ export function Select<T extends string | number>({
                             width: position.width,
                         }}
                         role="listbox"
-                        className="z-[95] rounded-lg bg-surface shadow-2xl py-1.5 max-h-60 overflow-y-auto scrollbar-hide"
+                        className="z-[95] rounded-[12px] bg-[#e2e8f0] dark:bg-[#1b1b1f] border border-border shadow-[0_4px_20px_rgba(0,0,0,0.18)] py-1.5 max-h-60 overflow-y-auto scrollbar-hide"
                     >
                         {options.map((option) => {
                             const isSelected = option.value === value;
@@ -113,10 +113,10 @@ export function Select<T extends string | number>({
                                         onChange(option.value);
                                         setOpen(false);
                                     }}
-                                    className={`w-full px-4 py-2.5 text-center text-[0.8rem] font-bold transition-colors flex items-center justify-center gap-2 ${
+                                    className={`w-full px-4 py-2.5 text-center text-ui-base font-bold transition-colors flex items-center justify-center gap-2 ${
                                         isSelected
-                                            ? 'text-primary bg-primary/5'
-                                            : 'text-foreground hover:bg-surface-hover'
+                                            ? 'text-primary bg-primary/10'
+                                            : 'text-foreground hover:bg-[#dde4ed] dark:hover:bg-white/[0.12]'
                                     }`}
                                 >
                                     {isSelected && <Check size={13} className="shrink-0" />}

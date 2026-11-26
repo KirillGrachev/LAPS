@@ -27,8 +27,8 @@ The Cargo lockfile records the crate version too; run
 5. Tag and push:
 
    ```powershell
-   git tag v2.1.0
-   git push origin v2.1.0
+   git tag v2.2.0
+   git push origin v2.2.0
    ```
 
 6. The `Release` workflow verifies the tag against the version, generates the

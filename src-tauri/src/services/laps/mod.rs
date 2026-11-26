@@ -5,23 +5,23 @@
 //! внешних процессов, PowerShell и RSAT.
 //!
 //! Поддерживаемые варианты хранения пароля:
-//! * legacy LAPS — `ms-Mcs-AdmPwd` (открытый текст, ACL на атрибут);
-//! * Windows LAPS — `msLAPS-Password` (JSON, открытое хранение);
-//! * Windows LAPS — `msLAPS-EncryptedPassword` (шифрованное хранение):
+//! * legacy LAPS - `ms-Mcs-AdmPwd` (открытый текст, ACL на атрибут);
+//! * Windows LAPS - `msLAPS-Password` (JSON, открытое хранение);
+//! * Windows LAPS - `msLAPS-EncryptedPassword` (шифрованное хранение):
 //!   конверт разбирается по MS-ADA2 2.66, а DPAPI-NG-блок расшифровывается
 //!   нативным API Windows LAPS (`lapsutil.dll!DecryptNormalMode`, см.
-//!   [`decrypt`]). Для SSO на старых сборках без `lapsutil.dll` остаётся
-//!   запасной `NCryptUnprotectSecret`. Если у учётной записи нет прав KDS
-//!   или маршрута к контроллеру домена, карточка всё равно возвращается:
-//!   UI показывает диагностику и доступные действия (например, сброс срока —
-//!   агент сгенерирует новый пароль).
+//!   [`decrypt`]); для SSO остаётся запасной `NCryptUnprotectSecret`. Если у
+//!   учётной записи процесса нет прав KDS или нет маршрута к контроллеру
+//!   домена, карточка всё равно возвращается: UI показывает диагностику
+//!   и доступные действия (например, сброс срока - агент сгенерирует
+//!   новый пароль).
 
 mod decrypt;
 mod expiration;
 mod model;
 mod parse;
 mod query;
-mod time;
+pub(crate) mod time;
 
 pub use expiration::RotationMode;
 pub use model::{LapsFlavor, LapsInfo};
@@ -54,11 +54,15 @@ fn decrypt_identity(credentials: &DirectoryCredentials<'_>) -> Option<DecryptIde
     }
     let (split_domain, user) = split_bind_account(account);
     // UPN нельзя передавать вместе с доменом; короткому имени домен
-    // подставляем из текущей Windows-сессии, если она доменная.
+    // подставляем из Base DN/LDAP URL (домен каталога), затем из текущей
+    // Windows-сессии. Иначе LogonWithCredentials создаёт локальный токен,
+    // и KDS отвечает 0x8009002C, даже когда права в AD есть.
     let domain = match split_domain {
         Some(domain) => Some(domain.to_string()),
         None if account.contains('@') => None,
-        None => current_domain(),
+        None => domain_from_base_dn(credentials.base_dn)
+            .or_else(|| domain_from_ldap_url(credentials.ldap_url))
+            .or_else(current_domain),
     };
     debug!(
         domain = ?domain,
@@ -70,6 +74,44 @@ fn decrypt_identity(credentials: &DirectoryCredentials<'_>) -> Option<DecryptIde
         user: user.to_string(),
         password: zeroize::Zeroizing::new(password.to_string()),
     })
+}
+
+/// DNS-домен из Base DN: `DC=company,DC=ru` -> `company.ru`.
+fn domain_from_base_dn(base_dn: &str) -> Option<String> {
+    let parts: Vec<&str> = base_dn
+        .split(',')
+        .filter_map(|part| {
+            let part = part.trim();
+            part.strip_prefix("DC=")
+                .or_else(|| part.strip_prefix("dc="))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
+        .collect();
+    (!parts.is_empty()).then(|| parts.join("."))
+}
+
+/// DNS-домен из LDAP URL: `ldap://dc1.company.ru` -> `company.ru`.
+fn domain_from_ldap_url(url: &str) -> Option<String> {
+    let host = url
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(url)
+        .split('/')
+        .next()?
+        .split(':')
+        .next()?;
+    if host.parse::<std::net::IpAddr>().is_ok() {
+        return None;
+    }
+    let labels: Vec<&str> = host.split('.').filter(|label| !label.is_empty()).collect();
+    if labels.len() >= 3 {
+        Some(labels[1..].join("."))
+    } else if labels.len() == 2 {
+        Some(labels.join("."))
+    } else {
+        None
+    }
 }
 
 /// NetBIOS-домен текущей Windows-сессии, если он не совпадает с именем
@@ -97,7 +139,7 @@ fn split_bind_account(account: &str) -> (Option<&str>, &str) {
 
 /// Карточка компьютера: для шифрованного хранения разбираем конверт
 /// `msLAPS-EncryptedPassword` и расшифровываем DPAPI-NG-блок нативно
-/// (`NCryptUnprotectSecret`, см. [`decrypt`]). Любая ошибка (нет прав KDS,
+/// (`lapsutil.dll!DecryptNormalMode`, см. [`decrypt`]). Любая ошибка (нет прав KDS,
 /// нет маршрута к контроллеру домена, повреждённый блок) не является
 /// отказом операции: карточка возвращается без пароля с диагностикой.
 async fn laps_info_from_entry(
@@ -129,10 +171,14 @@ async fn laps_info_from_entry(
     // Метка обновления из заголовка атрибута полезна и без дешифровки.
     info.updated_at = parsed.updated_at.and_then(time::filetime_to_rfc3339_local);
 
-    // lapsutil/LogonWithCredentials — блокирующие Win32/RPC-вызовы.
+    // lapsutil/LogonWithCredentials - блокирующие Win32/RPC-вызовы.
     // Уводим их с async-воркера, иначе недоступный DC подвешивает команду.
     let candidates: Vec<Vec<u8>> = parsed.candidates.iter().map(|part| part.to_vec()).collect();
     let identity = decrypt_identity(credentials);
+    let identity_label = identity
+        .as_ref()
+        .map(DecryptIdentity::label)
+        .unwrap_or_else(|| "текущая Windows-учётка".to_string());
     let outcome = tauri::async_runtime::spawn_blocking(move || {
         let refs: Vec<&[u8]> = candidates.iter().map(Vec::as_slice).collect();
         decrypt_windows_laps_password(&refs, identity.as_ref())
@@ -143,7 +189,10 @@ async fn laps_info_from_entry(
     match outcome {
         Ok(plain) => apply_decrypted(&mut info, plain),
         Err(reason) => {
-            let full_reason = format!("{reason}; заголовок: {}", parsed.diagnostics);
+            let full_reason = format!(
+                "identity={identity_label}; {reason}; заголовок: {}",
+                parsed.diagnostics
+            );
             tracing::warn!(
                 computer = %info.computer_name,
                 error = %full_reason,
@@ -171,7 +220,7 @@ const AMBIGUOUS_LIST_LIMIT: usize = 8;
 /// Поиск компьютера и чтение его LAPS-карточки.
 ///
 /// Ошибки возвращаются для транспортных/протокольных проблем, «не найден»
-/// и неоднозначности. Компьютер с шифрованным паролем — **не** ошибка:
+/// и неоднозначности. Компьютер с шифрованным паролем - **не** ошибка:
 /// возвращается карточка с `flavor = WindowsEncrypted` и `password = None`,
 /// чтобы UI показал диагностику и доступные операции.
 pub async fn search_computer(
@@ -227,7 +276,7 @@ pub async fn search_computer(
 
 /// Карточка компьютера обязана содержать читаемый пароль, кроме случаев
 /// шифрованного хранения (там UI показывает диагностику и управление сроком).
-/// Шифрованный вариант возвращаем карточкой с `password = None` —
+/// Шифрованный вариант возвращаем карточкой с `password = None` -
 /// это не ошибка: UI показывает диагностику и доступные операции.
 fn ensure_password_readable(info: &LapsInfo) -> Result<(), AppError> {
     match info.flavor {
@@ -249,7 +298,7 @@ fn ensure_password_readable(info: &LapsInfo) -> Result<(), AppError> {
 /// чтобы UI показал актуальное состояние.
 /// Текущее состояние объекта: какие атрибуты срока присутствуют.
 /// После записи объект перечитывается: UI показывает фактическое состояние.
-/// Объект исчез между операциями — крайне маловероятно, но контракт
+/// Объект исчез между операциями - крайне маловероятно, но контракт
 /// требует карточку: возвращаем состояние «до».
 pub async fn rotate_password(
     credentials: &DirectoryCredentials<'_>,
@@ -326,7 +375,7 @@ fn validate_dn(dn: &str) -> Result<(), AppError> {
         ));
     }
     // Компьютер в AD всегда CN=...; OU=/DC= не принимаем: команда меняет
-    // атрибуты объекта по DN, и лишние формы — ненужная поверхность атаки.
+    // атрибуты объекта по DN, и лишние формы - ненужная поверхность атаки.
     if !dn.to_ascii_lowercase().starts_with("cn=") {
         return Err(AppError::Validation(
             "DN объекта компьютера должен начинаться с CN=".into(),
@@ -373,7 +422,7 @@ pub(crate) async fn resolve_base_dn(
 }
 
 /// Диагностика подключения: bind, rootDSE, пробная выборка компьютеров.
-/// `auth_mode` — метка режима, которым выполнялась проверка
+/// `auth_mode` - метка режима, которым выполнялась проверка
 /// (`integrated` / `account` / `anonymous`): вызывающий знает сессию.
 pub async fn test_connection(
     credentials: &DirectoryCredentials<'_>,
@@ -395,6 +444,24 @@ pub async fn test_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn derives_domain_for_short_account_names() {
+        assert_eq!(
+            domain_from_base_dn("OU=Workstations,DC=company,DC=ru").as_deref(),
+            Some("company.ru")
+        );
+        assert_eq!(domain_from_base_dn("").as_deref(), None);
+        assert_eq!(
+            domain_from_ldap_url("ldap://dc1.company.ru:389").as_deref(),
+            Some("company.ru")
+        );
+        assert_eq!(
+            domain_from_ldap_url("ldaps://dc1.corp.local").as_deref(),
+            Some("corp.local")
+        );
+        assert_eq!(domain_from_ldap_url("ldap://10.0.0.5").as_deref(), None);
+    }
 
     #[test]
     fn splits_bind_account_for_decryption_token() {
@@ -462,7 +529,7 @@ mod tests {
             validate_dn(&("CN=x".to_string() + &"y".repeat(2000))),
             Err(AppError::Validation(_))
         ));
-        // Не CN= — не компьютер: OU=/DC= не принимаем.
+        // Не CN= - не компьютер: OU=/DC= не принимаем.
         assert!(matches!(
             validate_dn("OU=Workstations,DC=company,DC=ru"),
             Err(AppError::Validation(_))

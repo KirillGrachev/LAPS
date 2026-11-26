@@ -56,8 +56,8 @@ npm run tauri build
 Output:
 
 ```
-src-tauri/target/release/bundle/nsis/KMAruda LAPS_2.1.0_x64-setup.exe
-src-tauri/target/release/bundle/msi/KMAruda LAPS_2.1.0_x64_ru-RU.msi
+src-tauri/target/release/bundle/nsis/KMAruda LAPS_2.2.0_x64-setup.exe
+src-tauri/target/release/bundle/msi/KMAruda LAPS_2.2.0_x64_ru-RU.msi
 ```
 
 The MSI is built by WiX 3.14. On a workstation whose `%TEMP%` contains

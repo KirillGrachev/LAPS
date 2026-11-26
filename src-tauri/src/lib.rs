@@ -1,18 +1,20 @@
 //! Сборка Tauri-приложения: плагины, состояние, ужесточение webview,
 //! страховка показа окна и реестр IPC-команд.
 //!
-//! `main.rs` намеренно тонкий — вся композиция здесь, в библиотеке
+//! `main.rs` намеренно тонкий - вся композиция здесь, в библиотеке
 //! `app_lib`, чтобы её можно было переиспользовать в тестах
-//! (архитектура — как в `kmaruda-phonebook`).
+//! (архитектура - как в `kmaruda-phonebook`).
 
 mod commands;
 mod error;
 mod services;
 mod state;
+mod window_state;
 
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
+use time::macros::format_description;
 use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -23,17 +25,17 @@ const MAIN_WINDOW: &str = "main";
 
 /// Запуск приложения: композиция плагинов, состояния и подготовка окна.
 ///
-/// До инициализации Tauri проверяется наличие WebView2 Runtime — без него
+/// До инициализации Tauri проверяется наличие WebView2 Runtime - без него
 /// окно создать нечем; при отсутствии показывается нативный диалог, проверка
 /// отключается переменной `KMLAPS_SKIP_WEBVIEW_CHECK=1`. Плагин единственного
 /// экземпляра регистрируется первым (требование плагина на Windows): второй
-/// экземпляр не запускается — активируется существующее окно. Видимость окна
+/// экземпляр не запускается - активируется существующее окно. Видимость окна
 /// намеренно не восстанавливается из прошлой сессии: окно показывает фронтенд
 /// после гидрации, а при сбое JS срабатывает страховочный таймер показа.
 /// Плагин opener открывает внешние ссылки и папку журнала из Rust-команд
-/// (фронтенд не имеет прямых разрешений плагинов — минимум поверхности).
+/// (фронтенд не имеет прямых разрешений плагинов - минимум поверхности).
 /// В `setup`: разумный размер окна после аварийного восстановления,
-/// отключение веб-поведений WebView (продукт — приложение, а не сайт),
+/// отключение веб-поведений WebView (продукт - приложение, а не сайт),
 /// бренд-иконка окна и страховка принудительного показа.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -47,18 +49,9 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            info!("запуск второго экземпляра — активирую существующее окно");
+            info!("запуск второго экземпляра - активирую существующее окно");
             show_main_window(app);
         }))
-        .plugin(
-            tauri_plugin_window_state::Builder::default()
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::SIZE
-                        | tauri_plugin_window_state::StateFlags::POSITION
-                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
-                )
-                .build(),
-        )
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             init_tracing();
@@ -70,12 +63,18 @@ pub fn run() {
             let state = AppState::init(app.handle())?;
             app.manage(state);
 
+            window_state::restore(app.handle());
             sanitize_main_window_size(app);
             harden_main_webview(app);
             set_main_window_icon(app);
             spawn_window_failsafe(app.handle().clone());
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                window_state::save(window);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::auth::login,
@@ -91,6 +90,8 @@ pub fn run() {
             commands::audit::open_audit_folder,
             commands::system::app_environment,
             commands::system::open_external,
+            commands::system::write_clipboard_text,
+            commands::system::clear_clipboard_if_equals,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -106,16 +107,19 @@ impl tracing_subscriber::fmt::time::FormatTime for LocalTimer {
         &self,
         writer: &mut tracing_subscriber::fmt::format::Writer<'_>,
     ) -> std::fmt::Result {
-        write!(
-            writer,
-            "{}",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f %:z")
-        )
+        let now =
+            time::OffsetDateTime::now_local().unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+        let stamp = now
+            .format(format_description!(
+                "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3] [offset_hour sign:mandatory]:[offset_minute]"
+            ))
+            .unwrap_or_default();
+        write!(writer, "{stamp}")
     }
 }
 
 /// Подписчик логов: консоль и файл без ANSI-эскейпов (журнал читают и в
-/// перенаправленном файле вида `kmaruda-laps.exe > log.txt`, где эскейпы —
+/// перенаправленном файле вида `kmaruda-laps.exe > log.txt`, где эскейпы -
 /// мусор); модуль-источник пишется только в отладочной сборке.
 fn init_tracing() {
     let default_filter = if cfg!(debug_assertions) {
@@ -136,8 +140,8 @@ fn init_tracing() {
 
 /// Минимальный и стандартный размеры главного окна (логические пиксели).
 /// Держим синхронно с `minWidth/minHeight` и `width/height` в tauri.conf.json.
-const MIN_WINDOW_WIDTH: u32 = 900;
-const MIN_WINDOW_HEIGHT: u32 = 640;
+pub(crate) const MIN_WINDOW_WIDTH: u32 = 900;
+pub(crate) const MIN_WINDOW_HEIGHT: u32 = 680;
 const DEFAULT_WINDOW_WIDTH: u32 = 980;
 const DEFAULT_WINDOW_HEIGHT: u32 = 720;
 
@@ -151,7 +155,7 @@ const DEFAULT_WINDOW_HEIGHT: u32 = 720;
 /// Поэтому: (1) минимум выставляется рантаймом сразу, (2) восстановленный
 /// размер сравнивается с минимумом В ЛОГИЧЕСКИХ пикселях (через scale
 /// factor) и при нарушении заменяется стандартным с центрированием.
-/// Окно всегда без системной рамки: управление — только наш TitleBar.
+/// Окно всегда без системной рамки: управление - только наш TitleBar.
 fn sanitize_main_window_size(app: &tauri::App) {
     let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
         return;
@@ -170,7 +174,7 @@ fn sanitize_main_window_size(app: &tauri::App) {
             tracing::warn!(
                 logical_width,
                 logical_height,
-                "восстановлен размер окна меньше допустимого — применяю стандартный"
+                "восстановлен размер окна меньше допустимого - применяю стандартный"
             );
             let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
                 width: DEFAULT_WINDOW_WIDTH as f64,
@@ -183,18 +187,18 @@ fn sanitize_main_window_size(app: &tauri::App) {
 
 /// Отключение встроенных веб-поведений WebView2 (см. kmaruda-phonebook):
 /// автозаполнение форм/паролей, зум, браузерные акселераторы, свайп-навигация,
-/// статус-бар ссылок, контекстное меню браузера; DevTools — только в debug.
+/// статус-бар ссылок, контекстное меню браузера; DevTools - только в debug.
 ///
 /// Trait `Interface` для `.cast()` берётся из `windows-core` той же версии (0.62),
 /// на которой собран webview2-com-sys 0.39 (его использует wry/tauri). Импорт из
-/// crate `windows` 0.61 дал бы ДРУГОЙ экземпляр трейта `Interface` —
+/// crate `windows` 0.61 дал бы ДРУГОЙ экземпляр трейта `Interface` -
 /// и метод `.cast()` не нашёлся бы (ошибка E0599).
 ///
 /// # Safety
 /// Замыкание выполняется на главном потоке, пока WebView жив;
 /// controller/CoreWebView2/Settings возвращают валидные COM-объекты,
 /// вызовы только выставляют настройки интерфейса. Приведения к
-/// Settings3..6 — проверенные QueryInterface, каждый результат
+/// Settings3..6 - проверенные QueryInterface, каждый результат
 /// проверяется перед использованием.
 #[cfg(target_os = "windows")]
 fn harden_main_webview(app: &tauri::App) {
@@ -202,12 +206,36 @@ fn harden_main_webview(app: &tauri::App) {
         ICoreWebView2Settings3, ICoreWebView2Settings4, ICoreWebView2Settings5,
         ICoreWebView2Settings6,
     };
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED};
     use windows_core::Interface;
 
     let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
-        warn!("главное окно не найдено — веб-поведения не ужесточены");
+        warn!("главное окно не найдено - веб-поведения не ужесточены");
         return;
     };
+
+    // Окно должно появляться сразу, без DWM-анимации открытия/закрытия:
+    // это desktop-приложение, а не web-страница с «подъёмом».
+    if let Ok(hwnd) = window.hwnd() {
+        let disable = BOOL(1);
+        // Tauri использует windows 0.62, а DWM-вызов ниже - из windows 0.61
+        // (та же версия, что у остальных реестровых API). Конвертируем raw
+        // handle, чтобы не тащить вторую версию `windows` в публичный API.
+        let hwnd = HWND(hwnd.0);
+        let result = unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_TRANSITIONS_FORCEDISABLED,
+                (&disable as *const BOOL).cast(),
+                std::mem::size_of::<BOOL>() as u32,
+            )
+        };
+        if let Err(error) = result {
+            warn!(%error, "не удалось отключить DWM-переходы окна");
+        }
+    }
     let result = window.with_webview(|webview| unsafe {
         let Ok(core) = webview.controller().CoreWebView2() else {
             return;
@@ -242,10 +270,10 @@ fn harden_main_webview(app: &tauri::App) {
 #[cfg(not(target_os = "windows"))]
 fn harden_main_webview(_app: &tauri::App) {}
 
-/// Иконка окна и кнопки таскбара — из бренд-файла, встроенного в бинарник.
+/// Иконка окна и кнопки таскбара - из бренд-файла, встроенного в бинарник.
 fn set_main_window_icon(app: &tauri::App) {
     let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
-        warn!("главное окно не найдено — иконка не установлена");
+        warn!("главное окно не найдено - иконка не установлена");
         return;
     };
     let Ok(decoded) = image::load_from_memory(include_bytes!("../icons/icon.png")) else {
@@ -266,7 +294,7 @@ fn spawn_window_failsafe(app: AppHandle) {
         if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
             match window.is_visible() {
                 Ok(false) => {
-                    warn!("фронтенд не показал окно за 6 секунд — показываю принудительно");
+                    warn!("фронтенд не показал окно за 6 секунд - показываю принудительно");
                     let _ = window.show();
                     let _ = window.set_focus();
                 }

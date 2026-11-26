@@ -5,13 +5,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Минималистичные кнопки без обводок и теней: разделение слоёв —
+ * Минималистичные кнопки без обводок и теней: разделение слоёв -
  * только фоном (требование дизайна продукта).
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ({ className = '', variant = 'primary', ...props }, ref) => {
         const baseClasses =
-            'sm:w-auto w-full px-[24px] py-[10px] rounded-[8px] font-semibold text-[0.9rem] flex items-center justify-center gap-2 transition-colors duration-150 shrink-0 select-none enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 outline-none border-none';
+            'sm:w-auto w-full px-[24px] py-[10px] rounded-[8px] font-semibold text-ui-md flex items-center justify-center gap-2 transition-colors duration-150 shrink-0 select-none enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 outline-none border-none';
 
         const variants = {
             primary: 'bg-primary text-primary-foreground enabled:hover:bg-primary-hover',

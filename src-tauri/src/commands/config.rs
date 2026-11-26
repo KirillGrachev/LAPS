@@ -10,7 +10,7 @@ use crate::state::AppState;
 
 use super::{config_dir, run_blocking, write_audit, AdSession};
 
-/// Загрузка конфигурации. Учётных данных в конфигурации нет вовсе —
+/// Загрузка конфигурации. Учётных данных в конфигурации нет вовсе -
 /// вход выполняется при запуске и живёт только в памяти процесса.
 #[tauri::command]
 pub async fn load_config(state: State<'_, AppState>) -> Result<AppConfig, AppError> {
@@ -21,7 +21,7 @@ pub async fn load_config(state: State<'_, AppState>) -> Result<AppConfig, AppErr
 /// Сохранение конфигурации (автосохранение из настроек). Возвращает
 /// итоговую конфигурацию, чтобы фронтенд синхронизировал нормализованные
 /// значения (trim, темы, флаги).
-/// Субъект аудита — живая сессия, а до входа — идентификатор будущей аутентификации.
+/// Субъект аудита - живая сессия, а до входа - идентификатор будущей аутентификации.
 #[tauri::command]
 pub async fn save_config(
     state: State<'_, AppState>,
@@ -29,7 +29,18 @@ pub async fn save_config(
 ) -> Result<AppConfig, AppError> {
     let config_dir = config_dir(&state).to_path_buf();
     let audit_enabled = config.audit_enabled;
+    let previous = {
+        let dir = config_dir.clone();
+        run_blocking(move || ConfigStore::load(&dir)).await?
+    };
     let saved = run_blocking(move || ConfigStore::save(&config_dir, config)).await?;
+
+    // Автосохранение может прийти дважды с тем же состоянием (например,
+    // переключатель + отложенный debounce). Не плодим одинаковые события.
+    // Включение/выключение тестового режима - значимое изменение, его пишем.
+    if previous == saved {
+        return Ok(saved);
+    }
 
     info!("конфигурация сохранена");
     let actor = {
@@ -61,7 +72,7 @@ pub async fn save_config(
 }
 
 /// Диагностика подключения: bind (сессия / SSO / анонимно), rootDSE,
-/// пробная выборка компьютеров. Доступна до входа — администратор может
+/// пробная выборка компьютеров. Доступна до входа - администратор может
 /// настроить подключение до первой аутентификации; режим помечается
 /// в результате (`authMode`).
 #[tauri::command]

@@ -1,5 +1,5 @@
 //! Нативный LDAP-клиент на `ldap3` (tokio): запросы к Active Directory
-//! выполняются напрямую из Rust — без PowerShell, RSAT и модуля LAPS.
+//! выполняются напрямую из Rust - без PowerShell, RSAT и модуля LAPS.
 //!
 //! Возможности:
 //! * StartTLS и LDAPS, опционально без проверки сертификата (внутренние CA);
@@ -11,7 +11,7 @@
 //!   (актуально для бинарных `objectGUID`, `msLAPS-EncryptedPassword`);
 //! * диагностика кодов отказа аутентификации AD (`data 52e` и т.п.).
 //!
-//! Доменная логика LAPS живёт в [`crate::services::laps`]; этот модуль —
+//! Доменная логика LAPS живёт в [`crate::services::laps`]; этот модуль -
 //! только транспорт и разбор сырых записей.
 
 mod connect;
@@ -33,7 +33,7 @@ use crate::error::AppError;
 use connect::{bind, connect};
 use errors::{classify_error, classify_search_result};
 
-/// Публичная обёртка классификации транспортного сбоя (`LdapError`) —
+/// Публичная обёртка классификации транспортного сбоя (`LdapError`) -
 /// для доменных модулей, работающих с `ldap3` напрямую.
 pub fn classify_transport_error(url: &str, error: &ldap3::LdapError) -> AppError {
     classify_error(url, error)
@@ -64,7 +64,7 @@ pub struct RootDse {
 }
 
 /// Читает rootDSE (пустой base, scope Base). Недоступность rootDSE
-/// не фатальна для поиска — возвращает пустую структуру.
+/// не фатальна для поиска - возвращает пустую структуру.
 pub async fn read_root_dse(ldap: &mut ldap3::Ldap, url: &str) -> RootDse {
     let SearchResult(entries, result) = match ldap
         .with_timeout(OPERATION_TIMEOUT)
@@ -97,9 +97,9 @@ pub async fn read_root_dse(ldap: &mut ldap3::Ldap, url: &str) -> RootDse {
 
 /// Выполняет поиск и проверяет код результата.
 ///
-/// rc=4 (sizeLimitExceeded) — сервер вернул частичный ответ из-за
+/// rc=4 (sizeLimitExceeded) - сервер вернул частичный ответ из-за
 /// своего size limit: для диагностики и точечных фильтров это успех,
-/// записи в ответе валидны. Ошибка — любой иной ненулевой код.
+/// записи в ответе валидны. Ошибка - любой иной ненулевой код.
 pub async fn search(
     ldap: &mut ldap3::Ldap,
     url: &str,
@@ -123,7 +123,7 @@ pub async fn search(
 ///
 /// AD возвращает имена атрибутов в своём регистре (`dNSHostName`,
 /// `msLAPS-Password`), а ldap3 раскладывает значения по двум картам:
-/// строковые и бинарные — причём бинарное значение, случайно оказавшееся
+/// строковые и бинарные - причём бинарное значение, случайно оказавшееся
 /// валидным UTF-8, попадает в строковые. `NormalizedEntry` скрывает эти
 /// детали: `text()` и `binary()` ищут по обоим картам.
 #[derive(Debug, Clone)]
@@ -139,7 +139,7 @@ impl NormalizedEntry {
     }
 
     /// Конструктор из разобранной записи (используется и в тестах:
-    /// `ResultEntry` — «сырой» BER-тег, его в тестах не собрать).
+    /// `ResultEntry` - «сырой» BER-тег, его в тестах не собрать).
     pub fn from_search(entry: SearchEntry) -> Self {
         let attrs = entry
             .attrs
@@ -184,7 +184,7 @@ impl NormalizedEntry {
     ///
     /// Покрывает оба хранилища ldap3: бинарное значение, случайно
     /// оказавшееся валидным UTF-8, уносится драйвером в строковые
-    /// атрибуты — `has` проверяет обе карты.
+    /// атрибуты - `has` проверяет обе карты.
     pub fn has(&self, name: &str) -> bool {
         self.attrs
             .get(name)

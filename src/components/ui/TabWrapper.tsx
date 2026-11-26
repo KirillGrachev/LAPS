@@ -7,15 +7,18 @@ interface TabWrapperProps {
     className?: string;
 }
 
+/**
+ * Обёртка вкладки с мягким появлением. Вход в приложение (LoginScreen)
+ * сюда не входит: там анимация «подъёма» намеренно убрана.
+ */
 export function TabWrapper({ children, id, className = '' }: TabWrapperProps) {
     return (
         <motion.div
             key={id}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className={`bg-background overflow-hidden flex flex-col transition-colors duration-300 ${className}`}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className={`bg-background overflow-hidden flex flex-col ${className}`}
         >
             {children}
         </motion.div>

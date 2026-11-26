@@ -1,8 +1,8 @@
 [package]
 name = "kmaruda-laps"
-version = "2.1.0"
+version = "2.2.0"
 description = "KMAruda LAPS — чтение паролей локальных администраторов (LAPS) из Active Directory. Нативный LDAP-клиент, без PowerShell и RSAT."
-authors = ["KMAruda Development Team"]
+authors = ["Kirill Grachev"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.90"
@@ -16,7 +16,6 @@ tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
 tauri = { version = "2.11.2", features = [] }
-tauri-plugin-window-state = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-opener = "2"
 
@@ -36,13 +35,16 @@ flate2 = "1"
 
 # Дата/время: FILETIME AD (100-нс интервалы с 1601 г.) <-> RFC 3339,
 # локальный часовой пояс для отображения сроков действия паролей.
-chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+time = { version = "0.3", features = ["formatting", "parsing", "local-offset", "macros"] }
 
 # Гарантированное затирание секретов (пароль bind-учётки) в памяти.
 zeroize = { version = "1", features = ["derive"] }
 
 # PNG-иконка окна (встраивается в бинарник, не зависит от кэша иконок Windows).
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+# Нативный буфер обмена: WebView2 иначе показывает запрос доступа к clipboard.
+arboard = "3"
 
 [target.'cfg(windows)'.dependencies]
 # Интегрированная аутентификация (Kerberos/NTLM текущей сессии Windows) через SSPI.
@@ -58,6 +60,8 @@ webview2-com = "0.39.1"
 windows-core = "0.62"
 windows = { version = "0.61.3", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Security",
     "Win32_Security_Cryptography",
     "Win32_System_LibraryLoader",
     "Win32_System_Registry",

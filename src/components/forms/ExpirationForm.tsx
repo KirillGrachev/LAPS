@@ -5,6 +5,7 @@ import { DateTimePicker } from '../ui/DateTimePicker';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import type { LapsInfo } from '../../types';
 import { useTranslation } from '../../i18n/index.tsx';
+import { ExpirationStatusLine } from './ExpirationStatusLine';
 
 export interface ExpirationFormProps {
     result: LapsInfo | null;
@@ -24,9 +25,9 @@ function defaultDateTime(): string {
 
 /**
  * Управление сроком действия пароля LAPS:
- * * «Сменить пароль сейчас» — сброс срока (агент сгенерирует новый пароль
+ * * «Сменить пароль сейчас» - сброс срока (агент сгенерирует новый пароль
  *   при следующем применении политики), с диалогом подтверждения;
- * * «Изменить срок» — запись конкретной даты (продление).
+ * * «Изменить срок» - запись конкретной даты (продление).
  */
 export function ExpirationForm({ result, isRotating, rotationKind, onRotate }: ExpirationFormProps) {
     const { t } = useTranslation();
@@ -39,9 +40,12 @@ export function ExpirationForm({ result, isRotating, rotationKind, onRotate }: E
 
     return (
         <div className="w-full bg-surface rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-[0.72rem] font-black text-muted-foreground uppercase tracking-tight">
-                <CalendarClock size={14} className="text-primary" />
-                {t('search.rotation.title')}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 text-ui-sm font-black text-muted-foreground uppercase tracking-tight">
+                    <CalendarClock size={14} className="text-primary" />
+                    {t('search.rotation.title')}
+                </div>
+                <ExpirationStatusLine result={result} />
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -57,33 +61,19 @@ export function ExpirationForm({ result, isRotating, rotationKind, onRotate }: E
                     {t('search.rotation.resetNowBtn')}
                 </Button>
 
-                <div className="flex flex-1 gap-2 min-w-0 items-center">
-                    <DateTimePicker
-                        value={dateTime}
-                        onChange={setDateTime}
-                        disabled={disabled}
-                        ariaLabel={t('search.rotation.newExpirationLabel')}
-                        className="flex-1 min-w-0"
-                    />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={disabled || !dateTime}
-                        onClick={() => onRotate('at', dateTime)}
-                        className="h-[42px] px-5 font-bold gap-2.5 shrink-0"
-                    >
-                        {rotationKind === 'at' ? (
-                            <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                            <CalendarClock size={16} />
-                        )}
-                        {rotationKind === 'at' ? t('search.rotation.applyingBtn') : t('search.rotation.applyBtn')}
-                    </Button>
-                </div>
+                <DateTimePicker
+                    value={dateTime}
+                    onChange={setDateTime}
+                    disabled={disabled}
+                    ariaLabel={t('search.rotation.newExpirationLabel')}
+                    className="flex-1 min-w-0"
+                    onApply={(next) => onRotate('at', next)}
+                    applying={rotationKind === 'at'}
+                />
             </div>
 
             {!result.rotationPossible && (
-                <div className="flex items-start gap-2 text-[0.72rem] text-muted-foreground font-medium">
+                <div className="flex items-start gap-2 text-ui-sm text-muted-foreground font-medium">
                     <Info size={13} className="mt-0.5 shrink-0 opacity-60" />
                     {t('search.rotation.notPossible')}
                 </div>

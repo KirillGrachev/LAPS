@@ -4,11 +4,11 @@
  * localStorage, чтобы настройки и журнал переживали перезагрузку страницы.
  *
  * Демо-компьютеры покрывают все сценарии доменной логики:
- * * `WS01`      — Windows LAPS, открытое хранение (основной сценарий);
- * * `SRV-LEG01` — legacy LAPS (ms-Mcs-AdmPwd);
- * * `WS03`      — Windows LAPS, только шифрованный пароль (диагностика);
- * * `WS-NOLAPS` — компьютер без данных LAPS (ошибка NO_LAPS_DATA);
- * * всё прочее  — COMPUTER_NOT_FOUND.
+ * * `WS01`      - Windows LAPS, открытое хранение (основной сценарий);
+ * * `SRV-LEG01` - legacy LAPS (ms-Mcs-AdmPwd);
+ * * `WS03`      - Windows LAPS, только шифрованный пароль (диагностика);
+ * * `WS-NOLAPS` - компьютер без данных LAPS (ошибка NO_LAPS_DATA);
+ * * всё прочее  - COMPUTER_NOT_FOUND.
  */
 import type { AppConfig, AuditEvent, AuditPage, AppEnvironment, ConnectionTest, LapsInfo, IpcError } from '../types';
 
@@ -185,16 +185,23 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
             return mockSession as T;
         case 'login': {
             const config = loadConfig();
-            if (!config.ldapUrl) fail('CONFIG_ERROR', 'Не указан адрес контроллера домена.');
+            if (!config.ldapUrl && !config.testMode) {
+                fail('CONFIG_ERROR', 'Не указан адрес контроллера домена.');
+            }
             if (args?.sso) {
                 mockSession = { actor: 'MOCK\\engineer@DEV-PC', integrated: true };
             } else {
                 const account = String(args?.account ?? '').trim();
                 const password = String(args?.password ?? '');
-                if (!account) fail('VALIDATION', 'Укажите учётную запись');
-                if (!password) fail('VALIDATION', 'Укажите пароль');
-                if (password === 'bad') fail('LDAP_AUTH', 'неверный логин или пароль');
-                mockSession = { actor: `${account.toUpperCase()}@DEV-PC`, integrated: false };
+                if (!config.testMode) {
+                    if (!account) fail('VALIDATION', 'Укажите учётную запись');
+                    if (!password) fail('VALIDATION', 'Укажите пароль');
+                    if (password === 'bad') fail('LDAP_AUTH', 'неверный логин или пароль');
+                }
+                mockSession = {
+                    actor: account ? `${account.toUpperCase()}@DEV-PC` : 'MOCK\\demo@DEV-PC',
+                    integrated: false,
+                };
             }
             pushAudit({ action: 'login', target: mockSession?.actor ?? '-', code: 'OK' });
             return mockSession as T;
@@ -215,7 +222,7 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
         }
         case 'test_ldap_connection': {
             const config = loadConfig();
-            if (!config.ldapUrl) {
+            if (!config.ldapUrl && !config.testMode) {
                 fail('CONFIG_ERROR', 'Не указан адрес контроллера домена.');
             }
             const result: ConnectionTest = {
@@ -224,7 +231,12 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
                 defaultNamingContext: 'DC=company,DC=ru',
                 authMode: mockSession ? (mockSession.integrated ? 'integrated' : 'account') : 'anonymous',
             };
-            pushAudit({ action: 'connection_test', target: config.ldapUrl, code: 'OK', details: 'bind 42 мс' });
+            pushAudit({
+                action: 'connection_test',
+                target: config.ldapUrl || 'test-mode',
+                code: 'OK',
+                details: 'bind 42 мс',
+            });
             return result as T;
         }
         case 'search_computer': {
@@ -237,7 +249,7 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
                 return info as T;
             } catch (err) {
                 const ipc = err as IpcError;
-                // Журнал тестового режима обязан повторять бэкенд: неудачный поиск
+                // Журнал тестового режима повторяет бэкенд: неудачный поиск
                 // тоже пишет строку search_failed с кодом ошибки.
                 pushAudit({
                     action: 'search_failed',
@@ -256,7 +268,7 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
                 const name = dn.replace(/^CN=/i, '').split(',')[0];
                 const info = demoComputer(name);
                 if (!info.rotationPossible) {
-                    fail('NO_LAPS_DATA', 'На объекте компьютера нет атрибута срока истечения LAPS.');
+                    fail('NO_LAPS_DATA', 'На объекте компьютера нет атрибута срока истечения LAPS');
                 }
                 let expiresAt: string;
                 if (mode === 'now') {
@@ -264,7 +276,7 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
                 } else {
                     const parsed = new Date(String(args?.localDateTime ?? ''));
                     if (Number.isNaN(parsed.getTime())) {
-                        fail('VALIDATION', 'Некорректная дата/время: ожидается формат ГГГГ-ММ-ДДTЧЧ:ММ.');
+                        fail('VALIDATION', 'Некорректная дата/время: ожидается формат ГГГГ-ММ-ДДTЧЧ:ММ');
                     }
                     expiresAt = parsed.toISOString();
                 }
@@ -292,6 +304,21 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
             if (!mockSession) fail('NOT_AUTHENTICATED', 'Требуется вход');
             pushAudit({ action: 'copy', target: String(args?.computerName ?? '-'), code: 'OK' });
             return undefined as T;
+        }
+        case 'write_clipboard_text': {
+            await navigator.clipboard.writeText(String(args?.text ?? ''));
+            return undefined as T;
+        }
+        case 'clear_clipboard_if_equals': {
+            const expected = String(args?.expected ?? '');
+            try {
+                const current = await navigator.clipboard.readText();
+                if (current !== expected) return false as T;
+                await navigator.clipboard.writeText('');
+                return true as T;
+            } catch {
+                return false as T;
+            }
         }
         case 'list_audit': {
             const limit = Number(args?.limit ?? 50);

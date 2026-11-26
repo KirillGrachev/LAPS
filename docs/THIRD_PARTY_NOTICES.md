@@ -22,12 +22,12 @@ to generate a complete inventory before redistributing a build, and include the
 license texts of the packages you ship.
 
 Transport and platform crates include `tauri` (MIT/Apache-2.0), `ldap3`
-(MIT/Apache-2.0), `tokio` (MIT), `serde` (MIT/Apache-2.0), `chrono`
-(MIT/Apache-2.0), `flate2` (MIT/Apache-2.0), `zeroize` (MIT/Apache-2.0),
-`tracing` (MIT), `image` (MIT/Apache-2.0) and the `windows`/`windows-core`
-bindings (MIT/Apache-2.0). The React side includes React, React DOM, i18next,
-react-i18next, Radix UI Dialog, lucide-react, motion, sonner, date-fns,
-tailwind-merge and clsx (MIT), plus Tailwind CSS (MIT).
+(MIT/Apache-2.0), `tokio` (MIT), `serde` (MIT/Apache-2.0), `time`
+(MIT/Apache-2.0), `arboard` (MIT/Apache-2.0), `flate2` (MIT/Apache-2.0),
+`zeroize` (MIT/Apache-2.0), `tracing` (MIT), `image` (MIT/Apache-2.0) and the
+`windows`/`windows-core` bindings (MIT/Apache-2.0). The React side includes
+React, React DOM, i18next, react-i18next, Radix UI Dialog, lucide-react, motion,
+sonner, date-fns, tailwind-merge and clsx (MIT), plus Tailwind CSS (MIT).
 
 ## Microsoft WebView2
 

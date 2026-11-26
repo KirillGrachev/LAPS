@@ -8,7 +8,7 @@
 | Frontend | IPC routing, validation, formatting, locale parity, version consistency | `npm test` |
 | Static | rustfmt, clippy `-D warnings`, ESLint, `tsc --noEmit`, Prettier | see below |
 | Policy | no PowerShell, no shell plugin, no shell-allow capability | CI `Policy` job |
-| Supply chain | CodeQL, dependency review, OSV, `npm audit`, `cargo audit` (scheduled) | CI workflows |
+| Supply chain | CodeQL, dependency review, OSV, RustSec audit, `npm audit` | CI workflows |
 
 ```powershell
 npm run format:check

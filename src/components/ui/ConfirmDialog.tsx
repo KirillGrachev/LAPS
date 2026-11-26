@@ -11,14 +11,14 @@ interface ConfirmDialogProps {
     cancelLabel: string;
     onConfirm: () => void;
     onCancel: () => void;
-    /** Опасное действие — красная кнопка подтверждения. */
+    /** Опасное действие - красная кнопка подтверждения. */
     danger?: boolean;
     busy?: boolean;
 }
 
 /**
- * Лёгкий диалог подтверждения (hand-rolled, как в AboutTab первой версии):
- * Radix Dialog не нужен — сценарий простой, анимации — motion.
+ * Лёгкий диалог подтверждения: мягкое появление/закрытие, без резкой
+ * подмены содержимого.
  */
 export function ConfirmDialog({
     open,
@@ -38,14 +38,15 @@ export function ConfirmDialog({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
+                    transition={{ duration: 0.16 }}
                     className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm p-[20px]"
                     onClick={busy ? undefined : onCancel}
                 >
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                        initial={{ opacity: 0, scale: 0.96, y: 8 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 12 }}
-                        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                        exit={{ opacity: 0, scale: 0.97, y: 6 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
                         className="bg-surface w-full max-w-md rounded-2xl p-7 shadow-2xl flex flex-col gap-5"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -56,7 +57,7 @@ export function ConfirmDialog({
                                         <AlertTriangle size={16} className="text-red-500" />
                                     </div>
                                 )}
-                                <h3 className="text-[1.05rem] font-bold text-foreground tracking-tight">{title}</h3>
+                                <h3 className="text-ui-lg font-bold text-foreground tracking-tight">{title}</h3>
                             </div>
                             <button
                                 onClick={onCancel}
@@ -68,16 +69,14 @@ export function ConfirmDialog({
                             </button>
                         </div>
 
-                        <div className="text-[0.85rem] leading-relaxed text-muted-foreground font-medium">
-                            {message}
-                        </div>
+                        <div className="text-ui-base leading-relaxed text-muted-foreground font-medium">{message}</div>
 
                         <div className="flex justify-end gap-3 mt-1">
                             <Button
                                 variant="outline"
                                 onClick={onCancel}
                                 disabled={busy}
-                                className="px-5 py-2 text-[0.8rem]"
+                                className="px-5 py-2 text-ui-base"
                             >
                                 {cancelLabel}
                             </Button>
@@ -85,7 +84,7 @@ export function ConfirmDialog({
                                 variant={danger ? 'danger' : 'primary'}
                                 onClick={onConfirm}
                                 disabled={busy}
-                                className={`px-5 py-2 text-[0.8rem] ${
+                                className={`px-5 py-2 text-ui-base ${
                                     danger
                                         ? 'bg-red-600 hover:bg-red-700 border-transparent text-white enabled:hover:bg-red-700'
                                         : ''

@@ -1,9 +1,58 @@
 //! Системные команды: сведения об окружении, открытие внешних ссылок.
 
 use serde::Serialize;
+use tauri::State;
 
 use crate::error::AppError;
 use crate::services::audit::current_actor;
+use crate::state::AppState;
+
+use super::{run_blocking, AdSession};
+
+/// Запись в буфер обмена нативно, без разрешений WebView.
+///
+/// Доступна только после входа: команда вызывается при копировании пароля.
+#[tauri::command]
+pub async fn write_clipboard_text(
+    state: State<'_, AppState>,
+    text: String,
+) -> Result<(), AppError> {
+    let _session = AdSession::gated(&state).await?;
+    run_blocking(move || {
+        let mut clipboard = arboard::Clipboard::new()
+            .map_err(|e| AppError::Internal(format!("буфер обмена недоступен: {e}")))?;
+        clipboard
+            .set_text(text)
+            .map_err(|e| AppError::Internal(format!("не удалось записать буфер обмена: {e}")))
+    })
+    .await
+}
+
+/// Очищает буфер обмена, только если там лежит ожидаемое значение.
+///
+/// Наружу не отдаётся содержимое буфера: WebView узнаёт лишь факт очистки.
+/// Сессия не требуется, чтобы очистка работала при выходе и потере сессии.
+#[tauri::command]
+pub async fn clear_clipboard_if_equals(expected: String) -> Result<bool, AppError> {
+    run_blocking(move || {
+        let mut clipboard = arboard::Clipboard::new()
+            .map_err(|e| AppError::Internal(format!("буфер обмена недоступен: {e}")))?;
+        match clipboard.get_text() {
+            Ok(current) if current == expected => {
+                clipboard.set_text(String::new()).map_err(|e| {
+                    AppError::Internal(format!("не удалось очистить буфер обмена: {e}"))
+                })?;
+                Ok(true)
+            }
+            Ok(_) => Ok(false),
+            Err(arboard::Error::ContentNotAvailable) => Ok(false),
+            Err(e) => Err(AppError::Internal(format!(
+                "не удалось прочитать буфер обмена: {e}"
+            ))),
+        }
+    })
+    .await
+}
 
 /// Сведения об окружении для вкладки «О программе» и статусной панели.
 #[derive(Debug, Serialize)]
@@ -16,7 +65,7 @@ pub struct AppEnvironment {
     /// Доступна ли интегрированная аутентификация текущей сессии
     /// (только Windows-сборки).
     pub integrated_auth_available: bool,
-    /// Текущий пользователь Windows (`DOMAIN\user@MACHINE`) — подсказка
+    /// Текущий пользователь Windows (`DOMAIN\user@MACHINE`) - подсказка
     /// инженеру: под какой учёткой идут запросы к AD в режиме SSO.
     pub windows_identity: String,
 }

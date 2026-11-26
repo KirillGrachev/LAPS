@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, ArrowBigUp, FlaskConical } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Loader2, Eye, EyeOff, ArrowBigUp } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -18,13 +18,13 @@ interface LoginScreenProps {
 }
 
 /**
- * Экран входа: минимализм старой школы — логин, пароль, «Войти».
+ * Экран входа: минимализм старой школы - логин, пароль, «Войти».
  *
  * Безопасность: аутентификация при каждом запуске (настоящий LDAP-bind),
  * поля без подсказок и автозаполнения, учётные данные не сохраняются.
- * SSO под сессией Windows — опциональная маленькая ссылка ниже формы
+ * SSO под сессией Windows - опциональная маленькая ссылка ниже формы
  * (только в Windows-сборке).
- * В тестовом режиме вход демонстрационный — выводится подсказка, чтобы
+ * В тестовом режиме вход демонстрационный - выводится подсказка, чтобы
  * не принимать демо-сессию за настоящую.
  */
 export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
@@ -69,17 +69,11 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
 
     return (
         <div className="flex-1 flex items-center justify-center bg-background overflow-y-auto scrollbar-hide p-6">
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: 'easeOut' }}
-                className="w-full max-w-[360px] flex flex-col items-center gap-6"
-            >
+            <div className="w-full max-w-[360px] flex flex-col items-center gap-6">
                 <Logo size="lg" />
 
                 {config.testMode && (
-                    <span className="-mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[0.68rem] font-black text-center">
-                        <FlaskConical size={12} className="shrink-0" aria-hidden />
+                    <span className="-mt-2 inline-flex items-center px-4 py-2 rounded-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 text-ui-xs font-black text-center">
                         {t('auth.testModeNote')}
                     </span>
                 )}
@@ -88,7 +82,7 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
                     <div className="flex flex-col gap-1.5">
                         <label
                             htmlFor="login-account"
-                            className="text-[0.68rem] font-black text-muted-foreground uppercase tracking-tight text-center"
+                            className="text-[13px] font-bold text-muted-foreground uppercase text-center"
                         >
                             {t('auth.accountLabel')}
                         </label>
@@ -110,7 +104,7 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
                     <div className="flex flex-col gap-1.5">
                         <label
                             htmlFor="login-password"
-                            className="text-[0.68rem] font-black text-muted-foreground uppercase tracking-tight text-center"
+                            className="text-[13px] font-bold text-muted-foreground uppercase text-center"
                         >
                             {t('auth.passwordLabel')}
                         </label>
@@ -140,16 +134,26 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
                                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
-                        {capsOn && (
-                            <span className="inline-flex items-center justify-center gap-1.5 text-[0.66rem] font-bold text-amber-500">
-                                <ArrowBigUp size={12} className="shrink-0" />
-                                {t('auth.capsLock')}
-                            </span>
-                        )}
+                        <AnimatePresence initial={false}>
+                            {capsOn && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                                    className="overflow-hidden"
+                                >
+                                    <span className="inline-flex items-center justify-center gap-1.5 text-ui-xs font-bold text-amber-500">
+                                        <ArrowBigUp size={12} className="shrink-0" />
+                                        {t('auth.capsLock')}
+                                    </span>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                     <Button
                         type="submit"
-                        disabled={isLoggingIn || !account.trim() || !password}
+                        disabled={isLoggingIn || (!config.testMode && (!account.trim() || !password))}
                         className="w-full h-[42px] font-black"
                     >
                         {isLoggingIn ? <Loader2 size={15} className="animate-spin" /> : null}
@@ -158,7 +162,7 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
                 </form>
 
                 {error && (
-                    <p className="text-[0.72rem] font-bold text-red-500 text-center leading-snug break-words -mt-2">
+                    <p className="text-ui-sm font-bold text-red-500 text-center leading-snug break-words -mt-2">
                         {error}
                     </p>
                 )}
@@ -169,7 +173,7 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
                             type="button"
                             onClick={() => void enter(true)}
                             disabled={isLoggingIn}
-                            className="text-[0.68rem] font-bold text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                            className="text-ui-xs font-bold text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
                         >
                             {t('auth.ssoLink')}
                         </button>
@@ -177,12 +181,12 @@ export function LoginScreen({ onOpenSettings }: LoginScreenProps) {
                     <button
                         type="button"
                         onClick={onOpenSettings}
-                        className="text-[0.68rem] font-bold text-muted-foreground/60 hover:text-primary transition-colors"
+                        className="text-ui-xs font-bold text-muted-foreground/60 hover:text-primary transition-colors"
                     >
                         {t('auth.settingsLink')}
                     </button>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 }

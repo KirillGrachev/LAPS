@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, CheckCircle2, Copy, Monitor, Globe, UserCog, Clock, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Eye, EyeOff, CheckCircle2, Copy, Monitor, Globe, Sparkles } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { motion, AnimatePresence } from 'motion/react';
 import type { LapsInfo } from '../../types';
 import { useTranslation } from '../../i18n/index.tsx';
-import { expirationStatus, formatDateTime } from '../../lib/format';
+import { formatDateTime } from '../../lib/format';
 
 export interface PasswordResultProps {
     result: LapsInfo | null;
-    /** true — пароль реально попал в буфер обмена. */
+    /** true - пароль реально попал в буфер обмена. */
     copyPassword: () => Promise<boolean>;
 }
 
@@ -18,41 +18,6 @@ const AUTO_HIDE_MS = 30_000;
 
 /** Длина маски фиксирована: по числу точек не должно быть видно длину пароля. */
 const MASK_LENGTH = 16;
-
-/** Строка статуса срока истечения (цвет подсказывает срочность). */
-function ExpirationStatusLine({ result }: { result: LapsInfo }) {
-    const { t, language } = useTranslation();
-    const status = expirationStatus(result.expiresAt);
-
-    if (status.kind === 'notSet') {
-        return (
-            <span className="text-[0.75rem] font-bold text-muted-foreground">
-                {t('search.expirationStatus.resetPending')}
-            </span>
-        );
-    }
-
-    const date = formatDateTime(result.expiresAt, language);
-    let color = 'text-emerald-600 dark:text-emerald-400';
-    let text = t('search.expirationStatus.expiresAt', { date });
-    if (status.kind === 'expired') {
-        color = 'text-red-500';
-        text = t('search.expirationStatus.expired', { date });
-    } else if (status.kind === 'today') {
-        color = 'text-amber-500';
-        text = t('search.expirationStatus.expiresSoon');
-    } else if (status.kind === 'soon') {
-        color = 'text-amber-500';
-        text = `${t('search.expirationStatus.expiresIn', { days: status.days })} · ${date}`;
-    }
-
-    return (
-        <span className={`text-[0.75rem] font-bold ${color}`}>
-            <Clock size={12} className="inline mr-1.5 -mt-0.5" />
-            {text}
-        </span>
-    );
-}
 
 /**
  * Карточка результата: метаинформация о компьютере, пароль
@@ -63,9 +28,9 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [copied, setCopied] = useState(false);
 
-    // Новая карточка (другой компьютер или новый пароль после ротации) —
+    // Новая карточка (другой компьютер или новый пароль после ротации) -
     // снова маска: нельзя показывать секрет только потому, что у предыдущего
-    // пароля нажали «показать». Ключ — пара DN + значение пароля.
+    // пароля нажали «показать». Ключ - пара DN + значение пароля.
     useEffect(() => {
         setIsVisible(false);
         setCopied(false);
@@ -93,20 +58,20 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             className="w-full bg-surface rounded-2xl p-5 sm:p-6 flex flex-col gap-5"
         >
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-4 flex-wrap">
                 <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <Monitor size={16} className="text-primary shrink-0" />
-                        <span className="text-[1.05rem] font-black text-foreground tracking-tight uppercase truncate">
+                        <span className="text-ui-lg font-black text-foreground tracking-tight uppercase truncate">
                             {result.computerName}
                         </span>
                     </div>
-                    <div className="flex items-center gap-4 text-[0.72rem] text-muted-foreground font-medium flex-wrap">
+                    <div className="flex items-center gap-4 text-ui-sm text-muted-foreground font-medium flex-wrap">
                         {result.dnsHostName && (
                             <span className="inline-flex items-center gap-1">
                                 <Globe size={11} className="opacity-60" />
@@ -116,21 +81,20 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                         {result.operatingSystem && <span>{result.operatingSystem}</span>}
                     </div>
                 </div>
-                <ExpirationStatusLine result={result} />
             </div>
 
             {result.decrypted && result.password !== null && (
-                <div className="flex items-center gap-2 text-[0.72rem] font-bold text-primary">
+                <div className="flex items-center gap-2 text-ui-sm font-bold text-primary">
                     <Sparkles size={13} className="shrink-0" />
                     {t('search.encrypted.decryptedNote')}
                 </div>
             )}
 
             {result.flavor === 'windowsEncrypted' && result.password === null && (
-                <div className="flex flex-col gap-1 text-[0.72rem] font-medium text-muted-foreground leading-relaxed">
+                <div className="flex flex-col gap-1 text-ui-sm font-medium text-muted-foreground leading-relaxed">
                     <span>{t('search.encrypted.notDecryptedHint')}</span>
                     {result.decryptError && (
-                        <span className="font-mono text-[0.66rem] text-muted-foreground/60 break-all">
+                        <span className="font-mono text-ui-xs text-muted-foreground/60 break-all">
                             {t('search.encrypted.decryptErrorLabel')}: {result.decryptError}
                         </span>
                     )}
@@ -139,28 +103,35 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
 
             {(result.password !== null || result.flavor === 'windowsEncrypted') && (
                 <div className="flex flex-col gap-[8px]">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1.5">
                         <label
-                            htmlFor="currentPassword"
-                            className="text-[0.72rem] font-bold text-muted-foreground uppercase tracking-tight transition-colors"
+                            htmlFor="currentAccount"
+                            className="text-[13px] font-bold text-muted-foreground uppercase"
                         >
-                            {t('search.passwordLabel')}
+                            {t('search.labels.account')}
                         </label>
-                        {result.accountName && (
-                            <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-bold text-muted-foreground">
-                                <UserCog size={12} className="opacity-60" />
-                                {t('search.labels.account')}: {result.accountName}
-                            </span>
-                        )}
+                        <Input
+                            id="currentAccount"
+                            type="text"
+                            className="w-full h-[40px] sm:h-[44px] text-ui-md font-bold text-center"
+                            value={result.accountName ?? t('common.unknown')}
+                            readOnly
+                        />
                     </div>
+                    <label
+                        htmlFor="currentPassword"
+                        className="text-ui-label font-bold text-muted-foreground uppercase tracking-tight transition-colors"
+                    >
+                        {t('search.passwordLabel')}
+                    </label>
                     <div className="flex flex-col sm:flex-row gap-[8px] sm:gap-[10px]">
                         <div className="relative flex-1">
                             <Input
                                 id="currentPassword"
                                 type="text"
-                                className={`w-full h-[40px] sm:h-[44px] text-[1rem] md:text-[1.05rem] font-mono font-bold tracking-wide text-center ${
+                                className={`w-full h-[40px] sm:h-[44px] text-ui-lg font-mono font-bold tracking-wide text-center ${
                                     result.password === null
-                                        ? 'pr-4 text-muted-foreground/70 font-sans text-[0.85rem] select-none'
+                                        ? 'pr-4 text-muted-foreground/70 font-sans text-ui-base select-none'
                                         : 'pr-12'
                                 }`}
                                 value={
@@ -193,7 +164,7 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                             type="button"
                             onClick={() => void handleCopy()}
                             disabled={!result.password}
-                            className={`relative font-black h-[40px] sm:h-[44px] px-8 transition-all w-full sm:w-[160px] sm:min-w-[160px] flex-shrink-0 ${
+                            className={`relative font-black h-[40px] sm:h-[44px] px-8 transition-colors w-full sm:w-[160px] sm:min-w-[160px] flex-shrink-0 ${
                                 copied
                                     ? 'bg-green-600 hover:bg-green-700 border-transparent text-white shadow-lg shadow-green-600/20'
                                     : ''
@@ -206,7 +177,7 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                                        transition={{ duration: 0.16 }}
                                         className="flex items-center gap-2 justify-center"
                                     >
                                         <CheckCircle2 size={16} strokeWidth={3} />
@@ -218,7 +189,7 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                                        transition={{ duration: 0.16 }}
                                         className="flex items-center gap-2 justify-center"
                                     >
                                         <Copy size={16} strokeWidth={3} />
@@ -229,7 +200,7 @@ export function PasswordResult({ result, copyPassword }: PasswordResultProps) {
                         </Button>
                     </div>
                     {result.updatedAt && (
-                        <span className="text-[0.68rem] text-muted-foreground/70 font-medium text-center sm:text-left">
+                        <span className="text-ui-xs text-muted-foreground/70 font-medium text-center sm:text-left">
                             {t('search.labels.updated')}: {formatDateTime(result.updatedAt, language)}
                         </span>
                     )}

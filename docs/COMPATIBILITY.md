@@ -58,4 +58,6 @@ without it the card shows a diagnostic and no password.
   timeout.
 - Audit: 10 MiB live file, 14 gzip archives; older archives are deleted.
 - Clipboard auto-clear: off, or 10–300 seconds (default 30).
+- Window: minimum 900×680 logical pixels; size and position are restored when
+  the monitor is still available.
 - Search input: 255 characters; rotation date: 2000 .. now + 10 years.

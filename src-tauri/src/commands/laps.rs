@@ -16,7 +16,7 @@ use super::{write_audit, AdSession};
 
 /// Поиск компьютера и чтение пароля LAPS.
 ///
-/// `query` — имя (WS01), FQDN (ws01.company.ru) или IP-адрес.
+/// `query` - имя (WS01), FQDN (ws01.company.ru) или IP-адрес.
 #[tauri::command(rename_all = "camelCase")]
 pub async fn search_computer(
     state: State<'_, AppState>,
@@ -64,11 +64,11 @@ pub async fn search_computer(
 
 /// Сброс («сменить сейчас») или продление срока истечения пароля LAPS.
 ///
-/// * `dn` — DN объекта компьютера из результата `search_computer`;
-/// * `mode` — `"now"` (записать текущий момент: срок уже наступил, агент
+/// * `dn` - DN объекта компьютера из результата `search_computer`;
+/// * `mode` - `"now"` (записать текущий момент: срок уже наступил, агент
 ///   сменит пароль при следующем применении политики) или `"at"` (записать
 ///   конкретную дату);
-/// * `localDateTime` — для режима `"at"`: наивная локальная строка
+/// * `localDateTime` - для режима `"at"`: наивная локальная строка
 ///   `YYYY-MM-DDTHH:MM[:SS]` из datetime-пикера.
 #[tauri::command(rename_all = "camelCase")]
 pub async fn rotate_password(
@@ -123,7 +123,7 @@ pub async fn rotate_password(
 }
 
 /// Отметка о копировании пароля в буфер обмена. Копирование выполняет
-/// фронтенд (clipboard API webview), но событие пишется в общий журнал —
+/// фронтенд (clipboard API webview), но событие пишется в общий журнал -
 /// вызов этой команды обязателен для полноты аудита.
 #[tauri::command(rename_all = "camelCase")]
 pub async fn note_password_copied(

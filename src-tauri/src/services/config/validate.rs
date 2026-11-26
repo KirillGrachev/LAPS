@@ -30,7 +30,7 @@ pub(super) fn normalize_clipboard_clear(seconds: u32) -> u32 {
 
 /// Проверяет URL LDAP-сервера: схема `ldap://`/`ldaps://`, непустой хост,
 /// отсутствие пробелов и управляющих символов.
-/// Пустой URL допустим до первого сохранения — но см. `ensure_connection_config`.
+/// Пустой URL допустим до первого сохранения - но см. `ensure_connection_config`.
 pub(super) fn validate_ldap_url(raw: &str) -> Result<String, AppError> {
     let url = raw.trim().trim_end_matches('/').to_string();
     if url.is_empty() {
@@ -59,7 +59,7 @@ pub(super) fn validate_ldap_url(raw: &str) -> Result<String, AppError> {
             "Адрес сервера содержит недопустимые символы".into(),
         ));
     }
-    // Схема нормализуется к нижнему регистру: `LDAP://DC1` — валидный URL,
+    // Схема нормализуется к нижнему регистру: `LDAP://DC1` - валидный URL,
     // и он не должен ломать `starts_with("ldap://")` ниже по коду.
     let scheme = if lower.starts_with("ldaps://") {
         "ldaps"
@@ -160,7 +160,7 @@ mod tests {
             "ldaps://dc1.company.ru:636"
         );
         // Схема в верхнем регистре нормализуется, а не отклоняется:
-        // placeholder в интерфейсе показывает LDAP:// — так вводят копипастом.
+        // placeholder в интерфейсе показывает LDAP:// - так вводят копипастом.
         assert_eq!(
             validate_ldap_url("LDAP://DC1.company.ru").unwrap(),
             "ldap://DC1.company.ru"

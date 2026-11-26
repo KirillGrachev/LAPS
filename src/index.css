@@ -10,7 +10,7 @@
     font-family: 'Montserrat';
     font-style: normal;
     font-weight: 400;
-    font-display: swap;
+    font-display: block;
     src: url('/fonts/montserrat-400.ttf') format('truetype');
 }
 
@@ -18,7 +18,7 @@
     font-family: 'Montserrat';
     font-style: normal;
     font-weight: 500;
-    font-display: swap;
+    font-display: block;
     src: url('/fonts/montserrat-500.ttf') format('truetype');
 }
 
@@ -26,7 +26,7 @@
     font-family: 'Montserrat';
     font-style: normal;
     font-weight: 600;
-    font-display: swap;
+    font-display: block;
     src: url('/fonts/montserrat-600.ttf') format('truetype');
 }
 
@@ -34,7 +34,7 @@
     font-family: 'Montserrat';
     font-style: normal;
     font-weight: 700;
-    font-display: swap;
+    font-display: block;
     src: url('/fonts/montserrat-700.ttf') format('truetype');
 }
 
@@ -58,11 +58,46 @@
     --color-destructive: var(--destructive);
 }
 
+/*
+ * Единая типографическая шкала. Все текстовые размеры в приложении
+ * должны использовать эти классы, а не произвольные text-[0.xx rem].
+ */
+@layer utilities {
+    .text-ui-caption {
+        font-size: 0.62rem;
+    }
+    .text-ui-xs {
+        font-size: 0.68rem;
+    }
+    .text-ui-sm {
+        font-size: 0.72rem;
+    }
+    .text-ui-label {
+        font-size: 0.78rem;
+    }
+    .text-ui-base {
+        font-size: 0.85rem;
+    }
+    .text-ui-md {
+        font-size: 0.95rem;
+    }
+    .text-ui-lg {
+        font-size: 1.05rem;
+    }
+    .text-ui-xl {
+        font-size: 1.2rem;
+    }
+    .text-ui-2xl {
+        font-size: 1.3rem;
+    }
+}
+
 body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
+    font-size: 1rem;
     background-color: var(--background);
     color: var(--foreground);
     user-select: none;
@@ -75,7 +110,12 @@ body {
     background-color: var(--background);
 }
 
+/*
+ * Базовый масштаб интерфейса. Все размеры текста заданы в rem,
+ * поэтому 20px поднимает их согласованно, не разъезжаясь по компонентам.
+ */
 html {
+    font-size: 20px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -114,7 +154,7 @@ select {
     --destructive: #ef4444;
 }
 
-/* Плавный глобальный переход темы — только в момент переключения */
+/* Плавная смена темы — только на момент переключения. */
 .theme-transitioning * {
     transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
     transition-duration: 500ms !important;
@@ -212,6 +252,25 @@ body {
 }
 
 /* Минималистичный чекбокс без обводки: слой — только заливкой */
+/*
+ * Поля времени в календаре: WebView2/Chromium иногда подсвечивает
+ * number-input белым на focus. Держим фон неизменным.
+ */
+.time-input,
+.time-input:hover,
+.time-input:focus,
+.time-input:active {
+    background-color: #e2e8f0 !important;
+    box-shadow: none !important;
+}
+
+.dark .time-input,
+.dark .time-input:hover,
+.dark .time-input:focus,
+.dark .time-input:active {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 input[type='checkbox'].minimal {
     appearance: none;
     -webkit-appearance: none;

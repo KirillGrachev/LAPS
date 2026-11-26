@@ -1,8 +1,8 @@
 import { useState, KeyboardEvent } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Search, Loader2, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 
 interface SearchFormProps {
     initialQuery: string;
@@ -15,7 +15,7 @@ interface SearchFormProps {
 }
 
 /**
- * Форма поиска: контролируемый инпут (RHF для одного поля — оверкилл),
+ * Форма поиска: контролируемый инпут (RHF для одного поля - оверкилл),
  * Enter отправляет, Esc очищает результат.
  */
 export function SearchForm({
@@ -51,7 +51,7 @@ export function SearchForm({
         >
             <label
                 htmlFor="computerName"
-                className="text-[0.75rem] sm:text-[0.8rem] font-bold text-muted-foreground uppercase tracking-tight text-center transition-colors"
+                className="text-[13px] font-bold text-muted-foreground uppercase text-center transition-colors"
             >
                 {translate('search.computerNameLabel')}
             </label>
@@ -64,7 +64,7 @@ export function SearchForm({
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
                         disabled={isDisabled}
-                        className="w-full h-[40px] sm:h-[44px] font-bold text-center text-sm md:text-base uppercase disabled:opacity-75 disabled:cursor-not-allowed"
+                        className="w-full h-[40px] font-bold text-center disabled:opacity-75 disabled:cursor-not-allowed"
                         placeholder={translate('search.computerNamePlaceholder')}
                         autoComplete="off"
                         autoCorrect="off"
@@ -94,14 +94,14 @@ export function SearchForm({
                         disabled={isDisabled || !query.trim()}
                         className="bg-primary hover:bg-primary-hover text-primary-foreground h-[40px] sm:h-[44px] sm:px-4 font-bold transition-all shadow-sm w-full sm:w-[220px] sm:min-w-[220px] sm:max-w-[220px] mt-1 sm:mt-0 overflow-hidden flex items-center justify-center"
                     >
-                        <AnimatePresence mode="wait">
+                        <AnimatePresence mode="wait" initial={false}>
                             {isSearching ? (
                                 <motion.div
                                     key="searching"
-                                    initial={{ opacity: 0, y: 10 }}
+                                    initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
+                                    exit={{ opacity: 0, y: -8 }}
+                                    transition={{ duration: 0.16 }}
                                     className="flex items-center justify-center gap-3 w-full"
                                 >
                                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -110,10 +110,10 @@ export function SearchForm({
                             ) : (
                                 <motion.div
                                     key="idle"
-                                    initial={{ opacity: 0, y: 10 }}
+                                    initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
+                                    exit={{ opacity: 0, y: -8 }}
+                                    transition={{ duration: 0.16 }}
                                     className="flex items-center justify-center gap-3 w-full"
                                 >
                                     <Search className="w-5 h-5" />
