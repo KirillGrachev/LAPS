@@ -6,7 +6,7 @@ Directory over LDAP and to Windows LAPS through native Win32 APIs. Nothing is
 delegated to PowerShell, `cmd.exe`, RSAT or the `ActiveDirectory` module.
 
 This document describes the boundaries, the data flows and the decisions that
-shape them. It complements the [README](../README.md); operational details live
+shape them. It complements the [README](README.md); operational details live
 in [ADMIN](ADMIN.md), [BUILD](BUILD.md) and [TROUBLESHOOTING](TROUBLESHOOTING.md).
 
 ## Process model

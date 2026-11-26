@@ -14,6 +14,6 @@ documentation for a deployment.
 
 Current documentation:
 
-- [`../../README.md`](../../README.md) — overview, install, checks;
+- [`README.md`](../README.md) — overview, install, checks;
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — the native client;
 - [`../ADMIN.md`](../ADMIN.md) — AD and KDS permissions.
