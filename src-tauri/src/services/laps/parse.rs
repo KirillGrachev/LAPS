@@ -3,13 +3,13 @@
 //! Источники данных (см. `services/ldap` и MS LAPS schema reference):
 //! * legacy LAPS: `ms-Mcs-AdmPwd` (строка-пароль),
 //!   `ms-Mcs-AdmPwdExpirationTime` (десятичный FILETIME);
-//! * Windows LAPS, открытое хранение: `msLAPS-Password` — JSON
+//! * Windows LAPS, открытое хранение: `msLAPS-Password` - JSON
 //!   `{"n":"Administrator","t":"1d8161b41c41cde","p":"<пароль>"}`
-//!   (`t` — **шестнадцатеричный** FILETIME момента обновления),
+//!   (`t` - **шестнадцатеричный** FILETIME момента обновления),
 //!   `msLAPS-PasswordExpirationTime` (десятичный FILETIME);
-//! * Windows LAPS, шифрованное хранение: `msLAPS-EncryptedPassword` —
+//! * Windows LAPS, шифрованное хранение: `msLAPS-EncryptedPassword` -
 //!   конверт MS-ADA2 2.66 с DPAPI-NG/KDS-блоком. Заголовок разбирается
-//!   здесь (платформонезависимо, с тестами), дешифровка блока — в
+//!   здесь (платформонезависимо, с тестами), дешифровка блока - в
 //!   [`super::decrypt`] через нативный API Windows LAPS (`lapsutil.dll`).
 
 use serde::Deserialize;
@@ -32,7 +32,7 @@ pub const ATTR_WIN_ENCRYPTED: &str = "mslaps-encryptedpassword";
 
 /// Полный список атрибутов поискового запроса.
 ///
-/// `msLAPS-EncryptedPassword` запрашивается только для детекта presence —
+/// `msLAPS-EncryptedPassword` запрашивается только для детекта presence -
 /// значение (бинарный блок) наружу не отдаётся и в логах не появляется.
 pub const COMPUTER_ATTRIBUTES: &[&str] = &[
     "cn",
@@ -48,7 +48,7 @@ pub const COMPUTER_ATTRIBUTES: &[&str] = &[
 
 /// JSON содержимого `msLAPS-Password` (документированные поля `n`/`t`/`p`).
 ///
-/// Допускаются и «длинные» имена полей — некоторые сторонние агенты
+/// Допускаются и «длинные» имена полей - некоторые сторонние агенты
 /// и ранние сборки писали `{"Password":...,"TimeStamp":...}`; парсер
 /// терпим к обоим форматам.
 #[derive(Debug, Deserialize)]
@@ -83,7 +83,7 @@ const MIN_ENCRYPTED_BLOB_LEN: usize = 64;
 ///
 /// AD хранит в атрибуте не «голый» DPAPI-NG-блок, а конверт:
 /// `PasswordUpdateTimestamp (8) | EncryptedPasswordSize (4) | Reserved (4) |
-/// EncryptedPassword (N)`. Документированное смещение блока — 16 байт,
+/// EncryptedPassword (N)`. Документированное смещение блока - 16 байт,
 /// но разные агенты трактуют `EncryptedPasswordSize` по-разному:
 /// * размер только блока (Microsoft, LAPS4Linux);
 /// * размер вместе с 16-байтовым заголовком (встречается у сторонних
@@ -107,7 +107,7 @@ pub struct EncryptedLapsBlob<'a> {
 
 /// Разбирает конверт `msLAPS-EncryptedPassword` и собирает кандидатов.
 ///
-/// `Err` — только если значение физически короче заголовка. Любые
+/// `Err` - только если значение физически короче заголовка. Любые
 /// странности размера/timestamp превращаются в набор кандидатов:
 /// попытка расшифровки даст точную ошибку `lapsutil`, а не «некорректный
 /// заголовок».
@@ -139,7 +139,7 @@ pub fn parse_encrypted_laps_blob<'a>(raw: &'a [u8]) -> Result<EncryptedLapsBlob<
         }
     };
 
-    // Основной вариант: размер — только блок.
+    // Основной вариант: размер - только блок.
     if size_le > 0 && size_le <= payload.len() {
         add(&payload[..size_le]);
     }
@@ -156,6 +156,25 @@ pub fn parse_encrypted_laps_blob<'a>(raw: &'a [u8]) -> Result<EncryptedLapsBlob<
     if size_be > 0 && size_be <= payload.len() {
         add(&payload[..size_be]);
     }
+    // Ищем настоящий CMS/DER-блок по сигнатуре 0x30 в первых 64 байтах.
+    // Это ловит нестандартную длину заголовка (16/20/24 байта) и лишние
+    // поля, из-за которых фиксированный offset 16 давал NTE_BAD_DATA.
+    for offset in 0..raw.len().min(64) {
+        if raw[offset] != 0x30 {
+            continue;
+        }
+        let rest = &raw[offset..];
+        if let Some(total) = der_sequence_len(rest) {
+            if total >= MIN_ENCRYPTED_BLOB_LEN && total <= rest.len() {
+                add(&rest[..total]);
+            }
+        } else if rest.get(1) == Some(&0x80) {
+            // BER indefinite-length CMS: точную длину без разбора EOC не
+            // узнать, поэтому отдаём весь хвост от сигнатуры. Добавляем
+            // только сам SEQUENCE, а не каждый байт 0x30 в заголовке.
+            add(rest);
+        }
+    }
     // Последний шанс: весь хвост после заголовка.
     add(payload);
     // Совсем старые/сторонние агенты могли писать 12/8/4-байтовый
@@ -165,7 +184,7 @@ pub fn parse_encrypted_laps_blob<'a>(raw: &'a [u8]) -> Result<EncryptedLapsBlob<
             add(rest);
         }
     }
-    // Всё значение целиком — если конкретный API ждёт его в таком виде.
+    // Всё значение целиком - если конкретный API ждёт его в таком виде.
     add(raw);
 
     if candidates.is_empty() {
@@ -178,9 +197,10 @@ pub fn parse_encrypted_laps_blob<'a>(raw: &'a [u8]) -> Result<EncryptedLapsBlob<
         ));
     }
 
+    let candidate_sizes: Vec<usize> = candidates.iter().map(|part| part.len()).collect();
     let diagnostics = format!(
         "len={}, timestamp={}, size8={size_le}, size12={size_alt}, sizeBE={size_be}, \
-         payload={}, кандидатов={}, первые байты: {}",
+         payload={}, кандидатов={}, размеры={candidate_sizes:?}, первые байты: {}",
         raw.len(),
         timestamp,
         payload.len(),
@@ -195,7 +215,27 @@ pub fn parse_encrypted_laps_blob<'a>(raw: &'a [u8]) -> Result<EncryptedLapsBlob<
     })
 }
 
-/// Первые 24 байта значения в hex — для диагностики (без секретов:
+/// Длина ASN.1 SEQUENCE (CMS EnvelopedData) от первого байта 0x30.
+fn der_sequence_len(data: &[u8]) -> Option<usize> {
+    if data.first() != Some(&0x30) {
+        return None;
+    }
+    let first = *data.get(1)?;
+    if first & 0x80 == 0 {
+        return Some(2 + first as usize);
+    }
+    let count = (first & 0x7f) as usize;
+    if count == 0 || count > 4 || data.len() < 2 + count {
+        return None;
+    }
+    let mut length = 0usize;
+    for byte in &data[2..2 + count] {
+        length = length.checked_mul(256)?.checked_add(*byte as usize)?;
+    }
+    length.checked_add(2 + count)
+}
+
+/// Первые 24 байта значения в hex - для диагностики (без секретов:
 /// это шифртекст/заголовок, не пароль).
 fn hex_preview(raw: &[u8]) -> String {
     raw.iter()
@@ -210,7 +250,6 @@ fn hex_preview(raw: &[u8]) -> String {
 /// Windows LAPS пишет UTF-16LE JSON (`{"n":...,"t":...,"p":...}`), но
 /// встречаются агенты, сохраняющие UTF-8. Пробуем UTF-16LE, затем UTF-8;
 /// BOM и завершающие NUL отбрасываются.
-///
 /// На не-Windows сборке функция используется только тестами: сам вызов
 /// дешифровки живёт в Windows-модуле.
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -223,7 +262,7 @@ pub fn parse_windows_plain_payload(raw: &[u8]) -> Option<WindowsPlainPassword> {
 
 #[cfg_attr(not(windows), allow(dead_code))]
 fn parse_windows_plain_utf16le(raw: &[u8]) -> Option<WindowsPlainPassword> {
-    // Нечётная длина — почти наверняка не UTF-16LE: не рискуем.
+    // Нечётная длина - почти наверняка не UTF-16LE: не рискуем.
     if raw.len() < 2 || !raw.len().is_multiple_of(2) {
         return None;
     }
@@ -239,7 +278,7 @@ fn parse_windows_plain_utf16le(raw: &[u8]) -> Option<WindowsPlainPassword> {
 
 /// Разбор JSON из `msLAPS-Password`.
 ///
-/// Возвращает `None`, если JSON невалиден или в нём нет пароля —
+/// Возвращает `None`, если JSON невалиден или в нём нет пароля -
 /// такой атрибут трактуется как отсутствие данных (см. `pick_flavor`).
 /// Совместимость с «TimeStamp» в десятичном виде.
 pub fn parse_windows_plain_json(raw: &str) -> Option<WindowsPlainPassword> {
@@ -267,7 +306,7 @@ pub fn parse_windows_plain_json(raw: &str) -> Option<WindowsPlainPassword> {
 ///
 /// Приоритет: открытый Windows LAPS > legacy > шифрованный Windows LAPS.
 /// (Открытый новый формат предпочтительнее legacy-остатков миграции;
-/// шифрованный — только если открытых паролей нет вовсе.)
+/// шифрованный - только если открытых паролей нет вовсе.)
 pub fn pick_flavor(
     windows_plain_password: Option<&WindowsPlainPassword>,
     legacy_password: Option<&str>,
@@ -285,13 +324,12 @@ pub fn pick_flavor(
 }
 
 /// Собирает [`LapsInfo`] из записи каталога.
-/// Срок истечения: для Windows LAPS — новый атрибут, для legacy — старый.
+/// Срок истечения: для Windows LAPS - новый атрибут, для legacy - старый.
 /// В смешанном домене берём тот, что соответствует выбранному варианту,
 /// с запасным падением на второй.
 /// Писать срок истечения умеем в атрибут того семейства, которое
 /// присутствует на объекте (операция сброса/продления).
-/// Шифрованный пароль на этом этапе не отдаётся: его добавит
-/// `decrypt_windows_laps_password` после успешной нативной дешифровки.
+/// Шифрованный пароль не читается нативно - наружу не отдаём ничего.
 pub fn build_laps_info(entry: &NormalizedEntry) -> LapsInfo {
     let computer_name = entry
         .text(ATTR_SAM_ACCOUNT_NAME)
@@ -525,7 +563,7 @@ mod tests {
 
     #[test]
     /// Конверт MS-ADA2: 8 байт времени, 4 размера, 4 резерва, затем блок.
-    /// Смещение блока — 16, а не 0/4/8/12.
+    /// Смещение блока - 16, а не 0/4/8/12.
     fn parses_encrypted_attribute_envelope() {
         let blob = vec![0xAB; 96];
         let raw = encrypted_attribute(133_256_448_000_000_000, blob.len() as u32, &blob);
@@ -569,8 +607,8 @@ mod tests {
     }
 
     #[test]
-    /// Странный/нулевой/слишком большой размер — не отказ: последний
-    /// кандидат — весь хвост после заголовка. Точную ошибку даст lapsutil.
+    /// Странный/нулевой/слишком большой размер - не отказ: последний
+    /// кандидат - весь хвост после заголовка. Точную ошибку даст lapsutil.
     fn falls_back_to_payload_on_inconsistent_size() {
         let blob = vec![0xAB; 96];
         for declared in [0_u32, 8, 4096] {
@@ -579,6 +617,31 @@ mod tests {
                 parse_encrypted_laps_blob(&raw).unwrap_or_else(|e| panic!("size={declared}: {e}"));
             assert_eq!(parsed.candidates[0], blob.as_slice(), "size={declared}");
         }
+    }
+
+    #[test]
+    /// Нестандартный заголовок 20 байт: настоящий CMS-блок начинается
+    /// с 0x30, DER-длина должна вычислить точный срез.
+    fn finds_der_block_after_nonstandard_header() {
+        let mut blob = vec![0x30, 0x82, 0x00, 0x60];
+        blob.extend(std::iter::repeat_n(0xAB, 0x60)); // total = 100
+        let mut raw = Vec::new();
+        raw.extend_from_slice(&133_256_448_000_000_000u64.to_le_bytes());
+        raw.extend_from_slice(&0u32.to_le_bytes()); // size8 - мусор
+        raw.extend_from_slice(&0u32.to_le_bytes()); // size12
+        raw.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]); // лишние 4 байта
+        raw.extend_from_slice(&blob);
+
+        let parsed = parse_encrypted_laps_blob(&raw).expect("DER-блок найден");
+        assert!(
+            parsed.candidates.iter().any(|candidate| *candidate == blob),
+            "кандидаты: {:?}",
+            parsed
+                .candidates
+                .iter()
+                .map(|c| c.len())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -598,7 +661,7 @@ mod tests {
     }
 
     #[test]
-    /// Расшифрованный payload — UTF-16LE JSON; BOM и NUL отбрасываются.
+    /// Расшифрованный payload - UTF-16LE JSON; BOM и NUL отбрасываются.
     fn parses_utf16le_decrypted_payload() {
         let json = r#"{"n":"Administrator","t":"1d8161b41c41cde","p":"N3wP@ss!"}"#;
         let mut raw: Vec<u8> = vec![0xFF, 0xFE];

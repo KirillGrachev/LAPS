@@ -16,6 +16,7 @@ import { ru as localeRU, enUS as localeEN } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../i18n/index.tsx';
 import { formatDateTime } from '../../lib/format';
+import { Button } from './Button';
 import { usePopoverPosition } from './usePopoverPosition';
 
 interface DateTimePickerProps {
@@ -25,12 +26,16 @@ interface DateTimePickerProps {
     disabled?: boolean;
     ariaLabel?: string;
     className?: string;
+    /** Применить выбранные дату/время прямо из календаря. */
+    onApply?: (value: string) => void;
+    /** Показывает «Обновление…» на кнопке применения. */
+    applying?: boolean;
 }
 
 const pad = (n: number) => n.toString().padStart(2, '0');
 
 const PANEL_WIDTH = 268;
-const PANEL_HEIGHT = 372;
+const PANEL_HEIGHT = 430;
 
 function toLocalValue(date: Date, hours: number, minutes: number): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(hours)}:${pad(minutes)}`;
@@ -40,11 +45,19 @@ function toLocalValue(date: Date, hours: number, minutes: number): string {
  * Кастомный выбор даты и времени в стиле приложения.
  *
  * Попап рендерится через portal с `position: fixed` и клампом по краям
- * окна (при нехватке места снизу — раскрывается вверх): календарь никогда
- * не выходит за пределы формы приложения и не растягивает скролл —
+ * окна (при нехватке места снизу - раскрывается вверх): календарь никогда
+ * не выходит за пределы формы приложения и не растягивает скролл -
  * поведение нативного контрола, а не веб-страницы.
  */
-export function DateTimePicker({ value, onChange, disabled, ariaLabel, className = '' }: DateTimePickerProps) {
+export function DateTimePicker({
+    value,
+    onChange,
+    disabled,
+    ariaLabel,
+    className = '',
+    onApply,
+    applying = false,
+}: DateTimePickerProps) {
     const { t, language } = useTranslation();
     const locale = language === 'ru' ? localeRU : localeEN;
 
@@ -111,6 +124,8 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
         commitTime(hours, next);
     };
 
+    const currentValue = parsed ? toLocalValue(parsed, hours, minutes) : value;
+
     return (
         <div ref={rootRef} className={`relative ${className}`}>
             <button
@@ -120,7 +135,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                 aria-expanded={open}
                 disabled={disabled}
                 onClick={() => setOpen((v) => !v)}
-                className="relative w-full h-[42px] rounded-lg border-none bg-[#e6ebf2] dark:bg-white/[0.08] pl-4 pr-10 text-center text-[0.82rem] font-black text-foreground transition-colors hover:bg-[#dde4ed] dark:hover:bg-white/[0.13] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                className="relative w-full h-[42px] rounded-[10px] border border-border bg-[#e2e8f0] dark:bg-white/[0.08] pl-4 pr-10 text-center text-ui-md font-semibold text-foreground transition-colors focus:border-foreground/30 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
             >
                 <span className={`block truncate ${parsed ? '' : 'text-muted-foreground'}`}>
                     {parsed ? formatDateTime(value, language) : t('search.expiration.placeholder')}
@@ -142,7 +157,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                             top: position.top,
                             width: position.width,
                         }}
-                        className="z-[95] rounded-xl bg-surface shadow-2xl p-3 flex flex-col gap-3"
+                        className="z-[95] rounded-[12px] bg-[#e2e8f0] dark:bg-[#1b1b1f] border border-border shadow-[0_4px_20px_rgba(0,0,0,0.18)] p-3 flex flex-col gap-3"
                     >
                         <div className="flex items-center justify-between">
                             <button
@@ -153,7 +168,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                             >
                                 <ChevronLeft size={15} />
                             </button>
-                            <span className="text-[0.78rem] font-black text-foreground uppercase tracking-tight">
+                            <span className="text-ui-label font-black text-foreground uppercase tracking-tight">
                                 {format(month, 'LLLL yyyy', { locale })}
                             </span>
                             <button
@@ -170,7 +185,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                             {weekdayLabels.map((label, i) => (
                                 <span
                                     key={i}
-                                    className="h-6 flex items-center justify-center text-[0.6rem] font-black text-muted-foreground uppercase"
+                                    className="h-6 flex items-center justify-center text-ui-caption font-black text-muted-foreground uppercase"
                                 >
                                     {label}
                                 </span>
@@ -184,7 +199,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                                         key={day.toISOString()}
                                         type="button"
                                         onClick={() => commitDate(day)}
-                                        className={`h-8 rounded-lg text-[0.72rem] font-bold transition-colors ${
+                                        className={`h-8 rounded-lg text-ui-sm font-bold transition-colors ${
                                             selected
                                                 ? 'bg-primary text-primary-foreground shadow'
                                                 : today
@@ -201,7 +216,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                         </div>
 
                         <div className="flex flex-col items-center gap-1.5 pt-2 border-t border-border/60">
-                            <span className="text-[0.62rem] font-black text-muted-foreground uppercase tracking-tight">
+                            <span className="text-ui-caption font-black text-muted-foreground uppercase tracking-tight">
                                 {t('search.expiration.time')}
                             </span>
                             <div className="flex items-center justify-center gap-2">
@@ -211,7 +226,7 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                                     max={23}
                                     value={pad(hours)}
                                     onChange={(e) => onHours(e.target.value)}
-                                    className="w-12 h-9 rounded-lg border-none bg-[#e6ebf2] dark:bg-white/[0.08] text-center text-[0.85rem] font-black text-foreground outline-none focus:bg-white dark:focus:bg-white/[0.13] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="time-input w-12 h-9 rounded-[8px] border border-border text-center text-ui-base font-black text-foreground outline-none focus:border-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     aria-label="HH"
                                 />
                                 <span className="text-foreground font-black">:</span>
@@ -221,11 +236,26 @@ export function DateTimePicker({ value, onChange, disabled, ariaLabel, className
                                     max={59}
                                     value={pad(minutes)}
                                     onChange={(e) => onMinutes(e.target.value)}
-                                    className="w-12 h-9 rounded-lg border-none bg-[#e6ebf2] dark:bg-white/[0.08] text-center text-[0.85rem] font-black text-foreground outline-none focus:bg-white dark:focus:bg-white/[0.13] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="time-input w-12 h-9 rounded-[8px] border border-border text-center text-ui-base font-black text-foreground outline-none focus:border-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     aria-label="MM"
                                 />
                             </div>
                         </div>
+
+                        {onApply && (
+                            <Button
+                                type="button"
+                                variant="primary"
+                                disabled={disabled || applying}
+                                onClick={() => {
+                                    onApply(currentValue);
+                                    setOpen(false);
+                                }}
+                                className="w-full h-[38px] text-ui-base font-bold"
+                            >
+                                {applying ? t('search.rotation.applyingBtn') : t('search.rotation.applyBtn')}
+                            </Button>
+                        )}
                     </div>,
                     document.body,
                 )}

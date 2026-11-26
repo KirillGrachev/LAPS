@@ -6,7 +6,7 @@ use serde::Serialize;
 ///
 /// AD может содержать несколько наборов атрибутов одновременно (мигрирующий
 /// домен: агент старого LAPS ещё пишет `ms-Mcs-AdmPwd`, а Windows LAPS уже
-/// пишет `msLAPS-Password`). Приоритет выбора — см. [`super::parse::pick_flavor`]:
+/// пишет `msLAPS-Password`). Приоритет выбора - см. [`super::parse::pick_flavor`]:
 /// свежий Windows LAPS важнее legacy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,12 +42,12 @@ impl LapsFlavor {
 ///
 /// Контракт фронтенда (`camelCase`). `password` отсутствует, когда пароль
 /// недоступен для чтения текущей учётной записью (шифрованное хранение
-/// или пустые атрибуты) — такие результаты возвращаются только вместе
+/// или пустые атрибуты) - такие результаты возвращаются только вместе
 /// с типизированной ошибкой, но структура допускает `None` для полноты.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LapsInfo {
-    /// DN объекта компьютера — идентификатор для последующих операций
+    /// DN объекта компьютера - идентификатор для последующих операций
     /// (сброс срока истечения выполняется по DN, а не по имени).
     pub dn: String,
     /// Имя компьютера (CN / sAMAccountName без `$`).
@@ -71,7 +71,7 @@ pub struct LapsInfo {
     #[serde(default)]
     pub decrypted: bool,
     /// Как именно получен расшифрованный пароль. Сейчас единственный
-    /// путь — `dpapi-ng` (нативный `NCryptUnprotectSecret`, KDS домена);
+    /// путь - `dpapi-ng` (нативный `lapsutil.dll!DecryptNormalMode`, KDS домена);
     /// поле оставлено для прозрачности происхождения и будущих методов.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decrypt_method: Option<String>,
@@ -80,7 +80,7 @@ pub struct LapsInfo {
     /// UI показывает её как диагностику, а не как отказ операции.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decrypt_error: Option<String>,
-    /// Какие наборы атрибутов физически присутствуют на объекте —
+    /// Какие наборы атрибутов физически присутствуют на объекте -
     /// для диагностики смешанных/мигрирующих доменов в UI.
     pub legacy_present: bool,
     pub windows_plain_present: bool,
@@ -88,7 +88,7 @@ pub struct LapsInfo {
     /// Срок истечения можно изменить (есть атрибут, в который мы умеем
     /// писать для этого варианта LAPS).
     pub rotation_possible: bool,
-    /// Фактическое присутствие атрибутов срока истечения — внутренняя
+    /// Фактическое присутствие атрибутов срока истечения - внутренняя
     /// информация для построения LDAP-модификаций (не часть контракта UI).
     #[serde(skip)]
     pub win_expiration_present: bool,

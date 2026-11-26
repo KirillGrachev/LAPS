@@ -3,7 +3,7 @@ import { shouldUseMock, setTestModeActive, isTestModeActive } from '../ipc';
 
 const desktop = { tauri: true, dev: false };
 
-describe('shouldUseMock — маршрутизация команд IPC', () => {
+describe('shouldUseMock - маршрутизация команд IPC', () => {
     it('в браузерной разработке обслуживает моком все команды', () => {
         const env = { tauri: false, dev: true, testMode: false };
         expect(shouldUseMock('login', env)).toBe(true);

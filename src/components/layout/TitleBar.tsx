@@ -7,17 +7,18 @@ interface TitleBarProps {
     title: string;
     isMobileMenuOpen: boolean;
     toggleMobileMenu: () => void;
+    /** Скрыть гамбургер там, где меню нет (экран входа/настройки до входа). */
+    showMenu?: boolean;
 }
 
 /**
  * Заголовок окна: drag-регион, название раздела, мобильное меню
  * и кнопки управления окном.
  *
- * Окно изменяемого размера — состояние «развёрнуто» отслеживается
- * для корректной иконки кнопки (развернуть/восстановить).
- * В браузере кнопки управления окном скрываются, в Tauri — показываются.
+ * Drag-регион висит только на области заголовка, а не на всей строке:
+ * иначе кнопки меню и управления окном могут не получать клики.
  */
-export function TitleBar({ title, isMobileMenuOpen, toggleMobileMenu }: TitleBarProps) {
+export function TitleBar({ title, isMobileMenuOpen, toggleMobileMenu, showMenu = true }: TitleBarProps) {
     const { t } = useTranslation();
     const [isMaximized, setIsMaximized] = useState(false);
 
@@ -50,56 +51,55 @@ export function TitleBar({ title, isMobileMenuOpen, toggleMobileMenu }: TitleBar
         };
     }, []);
 
-    return (
-        <div
-            data-tauri-drag-region
-            className="relative h-[32px] bg-surface shrink-0 z-[60] flex items-center justify-between select-none border-b border-border"
+    const menuButton = showMenu ? (
+        <button
+            type="button"
+            onClick={toggleMobileMenu}
+            className="w-[46px] h-full flex items-center justify-center hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
+            title={isMobileMenuOpen ? t('app.close') : t('app.menu')}
+            aria-label={isMobileMenuOpen ? t('app.close') : t('app.menu')}
+            aria-expanded={isMobileMenuOpen}
         >
-            <div className="flex items-center h-full flex-1">
-                <div data-tauri-drag-region="false" className="lg:hidden h-full flex items-center">
-                    <button
-                        onClick={toggleMobileMenu}
-                        className="w-[46px] h-full flex items-center justify-center hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
-                        title={isMobileMenuOpen ? t('app.close') : t('app.menu')}
-                    >
-                        {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
-                    </button>
-                </div>
+            {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
+        </button>
+    ) : null;
+
+    return (
+        <div className="relative h-[32px] bg-surface shrink-0 z-[60] flex items-center justify-between select-none border-b border-border">
+            <div className="flex items-center h-full flex-1 min-w-0">
+                {showMenu && <div className="lg:hidden h-full flex items-center">{menuButton}</div>}
 
                 <div
                     data-tauri-drag-region
-                    style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-                    className="pl-3 flex items-center flex-1 h-full cursor-default"
+                    className="pl-3 flex items-center flex-1 h-full cursor-default min-w-0"
                     onDoubleClick={() => void system.toggleMaximizeWindow()}
                 >
-                    <span className="text-[0.65rem] font-bold text-foreground/40 uppercase tracking-normal">
-                        {title}
-                    </span>
+                    <span className="text-ui-xs font-bold text-foreground/40 tracking-normal truncate">{title}</span>
                 </div>
             </div>
 
             {system.isTauri() && (
-                <div
-                    data-tauri-drag-region="false"
-                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                    className="flex items-center h-full"
-                >
+                <div className="flex items-center h-full">
                     <button
                         id="win-minimize"
+                        type="button"
                         onClick={() => void system.minimizeWindow()}
                         className="w-[46px] h-full flex items-center justify-center hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
                         title={t('app.minimize')}
+                        aria-label={t('app.minimize')}
                     >
                         <Minus size={14} />
                     </button>
                     <button
                         id="win-maximize"
+                        type="button"
                         onClick={() => void system.toggleMaximizeWindow()}
                         className="w-[46px] h-full flex items-center justify-center hover:bg-foreground/5 text-foreground/40 hover:text-foreground transition-colors"
                         title={isMaximized ? t('app.restore') : t('app.maximize')}
+                        aria-label={isMaximized ? t('app.restore') : t('app.maximize')}
+                        aria-pressed={isMaximized}
                     >
                         {isMaximized ? (
-                            /* Иконка «восстановить»: два наложенных контура */
                             <svg
                                 width="11"
                                 height="11"
@@ -117,9 +117,11 @@ export function TitleBar({ title, isMobileMenuOpen, toggleMobileMenu }: TitleBar
                     </button>
                     <button
                         id="win-close"
+                        type="button"
                         onClick={() => void system.closeWindow()}
                         className="w-[46px] h-full flex items-center justify-center hover:bg-[#e81123] text-foreground/40 hover:text-white transition-colors"
                         title={t('app.close')}
+                        aria-label={t('app.close')}
                     >
                         <X size={16} />
                     </button>

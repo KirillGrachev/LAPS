@@ -2,7 +2,7 @@
 //!
 //! Windows LAPS хранит пароль как DPAPI-NG-блок (CNG group protection):
 //! CMS `EnvelopedData`, контентный ключ которого обёрнут под KEK,
-//! выведенный из **KDS root key** домена. Блок не содержит ключа — только
+//! выведенный из **KDS root key** домена. Блок не содержит ключа - только
 //! идентификатор ключа; разрешённый субъект получает нужный узел
 //! L0/L1/L2-дерева у контроллера домена по MS-GKDI и выводит KEK вниз.
 //!
@@ -17,7 +17,7 @@
 //!   учёткой), поэтому и показывала пароль.
 //!
 //! Если `lapsutil.dll` недоступен (очень старая Windows без Windows LAPS),
-//! остаётся запасной путь `NCryptUnprotectSecret` — но только для
+//! остаётся запасной путь `NCryptUnprotectSecret` - но только для
 //! SSO-сессии, где процесс и так работает под нужной учётной записью.
 //! Для явной учётной записи fallback намеренно запрещён: иначе пароль
 //! мог бы быть расшифрован под другим субъектом, чем выбрал оператор.
@@ -32,11 +32,11 @@
 /// в `spawn_blocking`: пароль копируется в `Zeroizing` и затирается при
 /// уничтожении структуры.
 ///
-/// На не-Windows сборке структура только создаётся (для честной валидации
-/// сессии), но не читается: дешифровка там недоступна.
+/// На не-Windows сборке структура только создаётся (для валидации сессии),
+/// но не читается: дешифровка там недоступна.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub struct DecryptIdentity {
-    /// NetBIOS-домен (`COMPANY`). `None` — UPN/локальная учётная запись;
+    /// NetBIOS-домен (`COMPANY`). `None` - UPN/локальная учётная запись;
     /// для короткого имени домен подставляется из `USERDOMAIN`, если
     /// приложение запущено под доменной учёткой.
     pub domain: Option<String>,
@@ -46,10 +46,21 @@ pub struct DecryptIdentity {
     pub password: zeroize::Zeroizing<String>,
 }
 
+impl DecryptIdentity {
+    /// Подпись для диагностики: `COMPANY\user` или `user@company.ru`.
+    /// Пароль сюда не попадает.
+    pub fn label(&self) -> String {
+        match &self.domain {
+            Some(domain) => format!("{domain}\\{}", self.user),
+            None => self.user.clone(),
+        }
+    }
+}
+
 /// Расшифровывает DPAPI-NG-блок и разбирает JSON-пароль Windows LAPS.
 ///
-/// `identity = None` — SSO/текущая учётная запись процесса.
-/// `identity = Some(...)` — явный вход: создаётся токен указанной учётной
+/// `identity = None` - SSO/текущая учётная запись процесса.
+/// `identity = Some(...)` - явный вход: создаётся токен указанной учётной
 /// записи, и дешифровка выполняется под ним.
 ///
 /// Ошибка возвращается короткой технической строкой без секретов:
@@ -62,46 +73,69 @@ pub fn decrypt_windows_laps_password(
 ) -> Result<super::parse::WindowsPlainPassword, String> {
     match LapsUtil::load() {
         Ok(laps) => {
-            let token = match identity {
-                Some(identity) => Some(laps.logon(identity)?),
-                None => None,
-            };
-
-            let mut last_error = "нет кандидатов на расшифровку".to_string();
-            for (index, blob) in candidates.iter().enumerate() {
-                match laps.decrypt(token.as_ref(), blob) {
-                    Ok(plain) => {
-                        tracing::debug!(
-                            candidate = index + 1,
-                            bytes = blob.len(),
-                            "LAPS: кандидат заголовка расшифрован"
-                        );
-                        return Ok(plain);
+            let mut errors = Vec::new();
+            if let Some(identity) = identity {
+                // Сначала сетевой токен `LogonWithCredentials`: его достаточно
+                // для KDS в обычном случае. Только если он не подошёл,
+                // создаём полноценный primary-токен `LogonUser(INTERACTIVE)`:
+                // у network-only токена иногда нет групп, которые проверяет KDS.
+                // Так на успешный поиск приходится один logon, а не два.
+                match laps.logon(identity) {
+                    Ok(token) => {
+                        if let Some(plain) = try_lapsutil_candidates(
+                            &laps,
+                            Some(&token),
+                            candidates,
+                            "lapsutil-explicit",
+                            &mut errors,
+                        ) {
+                            return Ok(plain);
+                        }
                     }
-                    Err(error) => {
-                        last_error =
-                            format!("вариант {} ({} байт): {error}", index + 1, blob.len());
-                    }
+                    Err(error) => errors.push(format!("токен lapsutil-explicit: {error}")),
                 }
+                match laps.logon_interactive(identity) {
+                    Ok(token) => {
+                        if let Some(plain) = try_lapsutil_candidates(
+                            &laps,
+                            Some(&token),
+                            candidates,
+                            "interactive-explicit",
+                            &mut errors,
+                        ) {
+                            return Ok(plain);
+                        }
+                    }
+                    Err(error) => errors.push(format!("токен interactive-explicit: {error}")),
+                }
+            } else if let Some(plain) = try_lapsutil_candidates(
+                &laps,
+                None,
+                candidates,
+                "integrated-current-user",
+                &mut errors,
+            ) {
+                // SSO: учётка входа и есть текущая Windows-учётка.
+                return Ok(plain);
             }
 
-            // SSO: та же учётная запись процесса, можно попробовать
-            // второй системный API. Явный вход — только его токен.
+            // NCrypt не умеет явный Windows-токен - только SSO/текущий
+            // процесс. Для явного входа этот путь запрещён: иначе пароль
+            // расшифровался бы под системной учёткой, а не под учёткой входа.
             if identity.is_none() {
                 for (index, blob) in candidates.iter().enumerate() {
                     match decrypt_with_ncrypt(blob) {
                         Ok(plain) => return Ok(plain),
-                        Err(error) => {
-                            last_error = format!(
-                                "{last_error}; NCrypt вариант {} ({} байт): {error}",
-                                index + 1,
-                                blob.len()
-                            );
-                        }
+                        Err(error) => errors.push(format!(
+                            "NCrypt вариант {} ({} байт): {error}",
+                            index + 1,
+                            blob.len()
+                        )),
                     }
                 }
             }
-            Err(last_error)
+
+            Err(errors.join("; "))
         }
         Err(load_error) => {
             if identity.is_some() {
@@ -110,23 +144,57 @@ pub fn decrypt_windows_laps_password(
                      требуется модуль Windows LAPS"
                 ))
             } else {
-                let mut last_error = format!("{load_error}; NCrypt:");
+                let mut errors = vec![load_error];
                 for (index, blob) in candidates.iter().enumerate() {
                     match decrypt_with_ncrypt(blob) {
                         Ok(plain) => return Ok(plain),
-                        Err(error) => {
-                            last_error.push_str(&format!(
-                                " вариант {} ({} байт): {error};",
-                                index + 1,
-                                blob.len()
-                            ));
-                        }
+                        Err(error) => errors.push(format!(
+                            "NCrypt вариант {} ({} байт): {error}",
+                            index + 1,
+                            blob.len()
+                        )),
                     }
                 }
-                Err(last_error)
+                Err(errors.join("; "))
             }
         }
     }
+}
+
+/// Перебирает кандидатов и оба режима `DecryptNormalMode`
+/// (`flags=0` - обычный, `0x20000000` - local KDS), собирая **все** ошибки.
+/// Иначе диагностика показывала только последний (заведомо неверный)
+/// вариант и скрывала ошибку правильного кандидата.
+#[cfg(windows)]
+fn try_lapsutil_candidates(
+    laps: &LapsUtil,
+    token: Option<&Token>,
+    candidates: &[&[u8]],
+    label: &str,
+    errors: &mut Vec<String>,
+) -> Option<super::parse::WindowsPlainPassword> {
+    for (index, blob) in candidates.iter().enumerate() {
+        for flags in [0_u32, 0x2000_0000_u32] {
+            match laps.decrypt(token, blob, flags) {
+                Ok(plain) => {
+                    tracing::debug!(
+                        identity = label,
+                        candidate = index + 1,
+                        bytes = blob.len(),
+                        flags = format_args!("0x{flags:08X}"),
+                        "LAPS: кандидат заголовка расшифрован"
+                    );
+                    return Some(plain);
+                }
+                Err(error) => errors.push(format!(
+                    "{label}: вариант {} ({} байт, flags=0x{flags:08X}): {error}",
+                    index + 1,
+                    blob.len()
+                )),
+            }
+        }
+    }
+    None
 }
 
 /// На не-Windows дешифровка Windows LAPS недоступна: приложение целевым
@@ -151,6 +219,9 @@ mod win {
     use windows::core::{s, HSTRING, PCWSTR};
     use windows::Win32::Foundation::{
         CloseHandle, FreeLibrary, LocalFree, HANDLE, HLOCAL, HMODULE,
+    };
+    use windows::Win32::Security::{
+        LogonUserW, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT,
     };
     use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
     use windows::Win32::System::SystemInformation::GetWindowsDirectoryW;
@@ -277,14 +348,63 @@ mod win {
             Ok(Token(token))
         }
 
+        /// Второй способ получить токен: полноценный интерактивный logon.
+        ///
+        /// `LogonWithCredentials` может выдать network-only токен без полного
+        /// набора групп; для KDS ACL это иногда даёт 0x8009002C даже при
+        /// наличии прав в AD. `LogonUserW(INTERACTIVE)` даёт primary-токен
+        /// с группами; если политика запрещает локальный вход сервисной
+        /// учётке, ошибка просто попадёт в диагностику.
+        pub(super) fn logon_interactive(
+            &self,
+            identity: &DecryptIdentity,
+        ) -> Result<Token, String> {
+            let user = wide(&identity.user);
+            let domain = identity.domain.as_deref().map(wide);
+            let mut password = wide(identity.password.as_str());
+            let mut token = HANDLE::default();
+
+            let result = unsafe {
+                LogonUserW(
+                    PCWSTR(user.as_ptr()),
+                    domain
+                        .as_ref()
+                        .map(|value| PCWSTR(value.as_ptr()))
+                        .unwrap_or(PCWSTR::null()),
+                    PCWSTR(password.as_ptr()),
+                    LOGON32_LOGON_INTERACTIVE,
+                    LOGON32_PROVIDER_DEFAULT,
+                    &mut token,
+                )
+            };
+            password.zeroize();
+
+            if let Err(error) = result {
+                if !token.is_invalid() {
+                    unsafe {
+                        let _ = CloseHandle(token);
+                    }
+                }
+                return Err(format!(
+                    "LogonUser(INTERACTIVE): {}",
+                    win32_error(error.code().0 as u32)
+                ));
+            }
+            if token.is_invalid() {
+                return Err("LogonUser(INTERACTIVE) вернул пустой токен".to_string());
+            }
+            Ok(Token(token))
+        }
+
         /// Расшифровывает внутренний DPAPI-NG-блок.
         ///
-        /// `flags = 0`: обычный режим (не recovery, не local KDS). Вывод —
+        /// `flags = 0`: обычный режим (не recovery, не local KDS). Вывод -
         /// UTF-16LE JSON; буфер принадлежит нам и освобождается `LocalFree`.
         pub(super) fn decrypt(
             &self,
             token: Option<&Token>,
             blob: &[u8],
+            flags: u32,
         ) -> Result<super::super::parse::WindowsPlainPassword, String> {
             if blob.len() > u32::MAX as usize {
                 return Err("блок LAPS слишком велик".to_string());
@@ -297,7 +417,7 @@ mod win {
                     token.map(|value| value.0).unwrap_or_default(),
                     blob.as_ptr(),
                     blob.len() as u32,
-                    0,
+                    flags,
                     &mut out,
                     &mut out_len,
                 )
@@ -374,7 +494,7 @@ mod win {
 
     /// Код `DecryptNormalMode` -> понятная причина.
     ///
-    /// 0x8009002C — NTE_NOT_FOUND/«нет доступа к ключу»: именно этот код
+    /// 0x8009002C - NTE_NOT_FOUND/«нет доступа к ключу»: именно этот код
     /// cmdlet трактует как Unauthorized (учётка не имеет права KDS).
     fn laps_error(code: u32) -> String {
         let hint = match code {
@@ -388,13 +508,13 @@ mod win {
 }
 
 #[cfg(windows)]
-use win::LapsUtil;
+use win::{LapsUtil, Token};
 
 // ── Запасной путь: NCryptUnprotectSecret ─────────────────────────────────────
 
 /// Прямой вызов DPAPI-NG через CNG. Оставлен для очень старых сборок,
 /// где `lapsutil.dll` отсутствует, и для SSO. В отличие от LAPS API,
-/// не умеет работать под отдельным токеном — только под процессом.
+/// не умеет работать под отдельным токеном - только под процессом.
 #[cfg(windows)]
 fn decrypt_with_ncrypt(blob: &[u8]) -> Result<super::parse::WindowsPlainPassword, String> {
     use windows::Win32::Security::Cryptography::{

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { LapsInfo } from '../types';
 import { tauriInvoke, toIpcError } from '../lib/ipc';
+import { clearClipboardIfEquals, writeClipboardText } from '../lib/clipboard';
 import { useTranslation } from '../i18n/index.tsx';
 import { useConfig } from '../context/ConfigContext';
 import { useSearchContext } from '../context/SearchContext';
@@ -30,6 +31,7 @@ export function useLapsSearch() {
         setError,
         lastSearchQuery,
         setLastSearchQuery,
+        sessionEpoch,
     } = useSearchContext();
 
     const { config } = useConfig();
@@ -78,25 +80,26 @@ export function useLapsSearch() {
             setIsSearching(true);
             setError(null);
             const seq = ++requestSeq.current;
+            const epoch = sessionEpoch;
             try {
                 const info = await tauriInvoke<LapsInfo>('search_computer', { query });
-                if (seq !== requestSeq.current) return;
+                if (seq !== requestSeq.current || epoch !== sessionEpoch) return;
                 setResult(info);
                 toast.success(t('search.resultTitle') + ': ' + info.computerName, {
                     id: 'search-result',
                 });
             } catch (err) {
-                if (seq !== requestSeq.current) return;
+                if (seq !== requestSeq.current || epoch !== sessionEpoch) return;
                 setResult(null);
                 const friendly = handleFailure(err);
                 setError(friendly);
                 toast.error(friendly, { id: 'search-error', duration: 8000 });
                 console.error('search_computer failed:', toIpcError(err));
             } finally {
-                if (seq === requestSeq.current) setIsSearching(false);
+                if (seq === requestSeq.current && epoch === sessionEpoch) setIsSearching(false);
             }
         },
-        [handleFailure, setError, setIsSearching, setLastSearchQuery, setResult, t],
+        [handleFailure, sessionEpoch, setError, setIsSearching, setLastSearchQuery, setResult, t],
     );
 
     /** Сброс срока («сменить пароль сейчас») или запись конкретной даты. */
@@ -112,47 +115,47 @@ export function useLapsSearch() {
             setRotationKind(mode);
             setError(null);
             const seq = ++requestSeq.current;
+            const epoch = sessionEpoch;
             try {
                 const updated = await tauriInvoke<LapsInfo>('rotate_password', {
                     dn: result.dn,
                     mode,
                     localDateTime: localDateTime ?? null,
                 });
-                if (seq !== requestSeq.current) return;
+                if (seq !== requestSeq.current || epoch !== sessionEpoch) return;
                 setResult(updated);
                 toast.success(mode === 'now' ? t('search.rotation.successNow') : t('search.rotation.successAt'), {
                     id: 'rotation-result',
                     duration: 6000,
                 });
             } catch (err) {
-                if (seq !== requestSeq.current) return;
+                if (seq !== requestSeq.current || epoch !== sessionEpoch) return;
                 const friendly = handleFailure(err);
                 setError(friendly);
                 toast.error(friendly, { id: 'rotation-error', duration: 8000 });
             } finally {
-                if (seq === requestSeq.current) {
+                if (seq === requestSeq.current && epoch === sessionEpoch) {
                     setIsRotating(false);
                     setRotationKind(null);
                 }
             }
         },
-        [handleFailure, result, setError, setIsRotating, setRotationKind, setResult, t],
+        [handleFailure, result, sessionEpoch, setError, setIsRotating, setRotationKind, setResult, t],
     );
 
     /**
      * Копирование пароля + автоочистка буфера + событие аудита.
      *
-     * Событие аудита пишет бэкенд в общий журнал. Автоочистка буфера
-     * настраивается в настройках; перед очисткой буфер читается, чтобы
-     * не затереть скопированное пользователем позже; нет фокуса или
-     * разрешения — молча пропускаем (best effort).
+     * Событие аудита пишет бэкенд в общий журнал и ожидается до отчёта об
+     * успехе: молчаливая потеря строки «copy» делает журнал неполным.
+     * Очистка сравнивает содержимое буфера в Rust: наружу значение не уходит.
      */
     const copyPassword = useCallback(async (): Promise<boolean> => {
         if (!result?.password) return false;
         const password = result.password;
 
         try {
-            await navigator.clipboard.writeText(password);
+            await writeClipboardText(password);
         } catch {
             toast.error(t('errors.INTERNAL'), { id: 'copy-error' });
             return false;
@@ -160,8 +163,6 @@ export function useLapsSearch() {
 
         toast.success(t('search.copiedToast'), { id: 'copy-success' });
 
-        // Событие аудита обязательно фиксируем до того, как считаем копирование
-        // завершённым: молчаливая потеря строки «copy» делает журнал неполным.
         try {
             await tauriInvoke('note_password_copied', { computerName: result.computerName });
         } catch (err) {
@@ -175,20 +176,13 @@ export function useLapsSearch() {
             toast.info(t('search.clipboardClearToast', { seconds }), { id: 'copy-clear-info' });
             const timer = window.setTimeout(async () => {
                 try {
-                    const current = await navigator.clipboard.readText();
-                    if (current === password) {
-                        await navigator.clipboard.writeText('');
+                    if (await clearClipboardIfEquals(password)) {
                         toast.info(t('search.clipboardClearedToast'), { id: 'copy-cleared' });
                     }
                 } catch {
-                    // readText недоступен без фокуса окна: чистим безусловно — в буфере
-                    // сейчас лежит именно скопированный пароль.
-                    try {
-                        await navigator.clipboard.writeText('');
-                        toast.info(t('search.clipboardClearedToast'), { id: 'copy-cleared' });
-                    } catch {
-                        toast.warning(t('search.clipboardClearFailed'), { id: 'copy-clear-failed' });
-                    }
+                    toast.warning(t('search.clipboardClearFailed'), {
+                        id: 'copy-clear-failed',
+                    });
                 }
             }, seconds * 1000);
             clipboardTimers.current.push(timer);
@@ -203,13 +197,12 @@ export function useLapsSearch() {
         setIsRotating(false);
         setRotationKind(null);
         const password = result?.password;
-        if (password) {
+        if (password && config.clipboardClearSeconds > 0) {
             void (async () => {
                 try {
-                    const current = await navigator.clipboard.readText();
-                    if (current === password) await navigator.clipboard.writeText('');
+                    await clearClipboardIfEquals(password);
                 } catch {
-                    // Clipboard может быть недоступен — это best effort.
+                    // Clipboard может быть недоступен - это best effort.
                 }
             })();
         }
@@ -220,6 +213,7 @@ export function useLapsSearch() {
         toast.dismiss('search-error');
     }, [
         clearClipboardTimers,
+        config.clipboardClearSeconds,
         result?.password,
         setError,
         setIsRotating,

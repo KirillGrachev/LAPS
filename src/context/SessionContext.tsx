@@ -9,7 +9,7 @@ interface SessionContextType {
     setSession: (session: SessionInfo | null) => void;
     /** Выход: стирает сессию на бэкенде (пароль затирается в памяти). */
     logout: () => Promise<void>;
-    /** Команды вернули NOT_AUTHENTICATED — принудительно возвращаем ко входу. */
+    /** Команды вернули NOT_AUTHENTICATED - принудительно возвращаем ко входу. */
     requireReauth: () => void;
 }
 

@@ -1,0 +1,27 @@
+# cargo-audit: явно фиксируем, почему эти advisory не относятся к продукту.
+#
+# Продукт — Windows-приложение (LAPS/AD/KDS). Перечисленные ниже пакеты
+# приходят только через Linux/GTK/X11-стек Tauri (gtk/tao/wry, zbus) и в
+# Windows-бинарник не линкуются. Для них нет исправленных релизов в текущей
+# стабильной ветке Tauri 2.x; единственный «апгрейд» — Tauri 3 alpha.
+#
+# chrono: unmaintained; сам код приложения переведён на `time`, но chrono
+# остаётся транзитивно через serde_with из Tauri.
+# proc-macro-error: unmaintained, build-time зависимость glib-macros.
+# zbus_names/zvariant/zvariant_derive: unmaintained, Linux D-Bus стек
+# single-instance/opener.
+# glib: unsound, Linux/GTK.
+#
+# Это не «скрытие уязвимостей»: RUSTSEC-2026-0592 (url) и остальные
+# реальные уязвимости исправлены обновлением зависимостей. Здесь —
+# unmaintained/unsound предупреждения неприменимой платформы.
+
+[advisories]
+ignore = [
+  "RUSTSEC-2026-0543",
+  "RUSTSEC-2024-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0372",
+  "RUSTSEC-2024-0429",
+]

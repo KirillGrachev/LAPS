@@ -1,24 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    Sun,
-    Moon,
-    Monitor,
-    PlugZap,
-    Loader2,
-    CheckCircle2,
-    XCircle,
-    ShieldCheck,
-    FolderOpen,
-    TriangleAlert,
-    Database,
-    Lock,
-    Palette,
-    FlaskConical,
-    ArrowLeft,
-    ChevronRight,
-    Check,
-} from 'lucide-react';
+import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { PageLayout } from '../ui/PageLayout';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -36,28 +18,15 @@ const CLIPBOARD_OPTIONS = [0, 15, 30, 60, 120];
 
 type SettingsView = 'menu' | 'ad' | 'security' | 'interface';
 
-/** Строка меню настроек — стилистика hubs справочника. */
-function MenuRow({
-    icon: Icon,
-    tint,
-    title,
-    onClick,
-}: {
-    icon: typeof Database;
-    tint: string;
-    title: string;
-    onClick: () => void;
-}) {
+/** Строка меню настроек: без декоративных иконок, только текст и переход. */
+function MenuRow({ title, onClick }: { title: string; onClick: () => void }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className="w-full flex items-center gap-4 rounded-xl bg-surface px-5 py-4 hover:bg-surface-hover transition-colors text-left"
+            className="w-full flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-4 hover:bg-surface-hover transition-all duration-300 text-left shadow-sm"
         >
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tint}`}>
-                <Icon size={18} />
-            </span>
-            <span className="flex-1 text-[0.95rem] font-black text-foreground truncate">{title}</span>
+            <span className="flex-1 text-ui-md font-bold text-foreground truncate">{title}</span>
             <ChevronRight size={16} className="text-muted-foreground/50 shrink-0" />
         </button>
     );
@@ -70,7 +39,8 @@ function ToggleRow({
     onChange,
     label,
     hint,
-    warning,
+    tone = 'primary',
+    alert = false,
     disabled,
 }: {
     id: string;
@@ -78,7 +48,8 @@ function ToggleRow({
     onChange: (value: boolean) => void;
     label: string;
     hint?: string;
-    warning?: string;
+    tone?: 'primary' | 'amber';
+    alert?: boolean;
     disabled?: boolean;
 }) {
     return (
@@ -86,20 +57,15 @@ function ToggleRow({
             <div className="flex flex-col gap-1 min-w-0">
                 <label
                     htmlFor={id}
-                    className="text-[0.85rem] text-foreground font-bold cursor-pointer select-none leading-snug"
+                    className="flex items-center gap-1.5 text-ui-label text-foreground font-bold cursor-pointer select-none leading-snug"
                 >
+                    {alert && <ShieldAlert size={14} className="text-amber-500 shrink-0" />}
                     {label}
                 </label>
-                {hint && <span className="text-[0.7rem] text-muted-foreground font-medium leading-snug">{hint}</span>}
-                {warning && checked && (
-                    <span className="inline-flex items-center gap-1.5 text-[0.7rem] text-amber-500 font-bold leading-snug">
-                        <TriangleAlert size={12} className="shrink-0" />
-                        {warning}
-                    </span>
-                )}
+                {hint && <span className="text-ui-xs text-muted-foreground font-medium leading-snug">{hint}</span>}
             </div>
             <div className="pt-0.5">
-                <Switch id={id} checked={checked} onChange={onChange} disabled={disabled} />
+                <Switch id={id} checked={checked} onChange={onChange} disabled={disabled} tone={tone} />
             </div>
         </div>
     );
@@ -109,11 +75,11 @@ function ToggleRow({
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
     return (
         <div className="flex flex-col gap-1.5 w-full">
-            <label htmlFor={id} className="text-[0.68rem] font-black text-muted-foreground uppercase tracking-tight">
+            <label htmlFor={id} className="text-[13px] font-bold text-muted-foreground uppercase ml-1">
                 {label}
             </label>
             {children}
-            {hint && <span className="text-[0.68rem] text-muted-foreground/80 font-medium leading-snug">{hint}</span>}
+            {hint && <span className="text-[13px] text-muted-foreground ml-1 leading-snug">{hint}</span>}
         </div>
     );
 }
@@ -127,10 +93,10 @@ interface SettingsTabProps {
 /**
  * Хаб настроек со страницами разделов.
  *
- * Автосохранение: черновик уехал от сохранённой конфигурации —
+ * Автосохранение: черновик уехал от сохранённой конфигурации -
  * дебаунс 600 мс и тихий save; первый рендер не сохраняем.
  * my-auto: короткий контент (меню разделов) центрируется по
- * вертикали страницы, как в справочнике; длинный — скроллится
+ * вертикали страницы, как в справочнике; длинный - скроллится
  * от верха без артефактов.
  */
 export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps) {
@@ -154,9 +120,8 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
         draftRef.current = draft;
     }, [draft]);
 
-    // Внешнее изменение конфигурации (первая загрузка, другое окно) принимаем,
-    // только если в черновике нет несохранённых правок: иначе ответ save
-    // затирал символы, набранные за время запроса.
+    // Внешнее изменение конфигурации принимаем, только если в черновике нет
+    // несохранённых правок: иначе ответ save затирал новые символы.
     useEffect(() => {
         if (!dirty) setDraft({ ...config });
     }, [config, dirty]);
@@ -166,7 +131,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
         setDirty(true);
     };
 
-    /** Схема LDAP: недописанный адрес не отправляем — это даёт ложные тосты. */
+    /** Схема LDAP: недописанный адрес не отправляем - это даёт ложные тосты. */
     const hasCompleteLdapUrl = (value: string) => {
         const url = value.trim();
         return url === '' || /^ldaps?:\/\//i.test(url);
@@ -183,8 +148,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
             const saved = await saveConfig(draft, { silent: true });
             if (!saved) return;
             setAutoSavedAt(Date.now());
-            // Пока шёл save, пользователь мог продолжить печатать: не сбрасываем
-            // dirty, если черновик уже ушёл от сохранённого снимка.
+            // Пока шёл save, пользователь мог продолжить печатать.
             if (JSON.stringify(draftRef.current) === JSON.stringify(saved)) {
                 setDirty(false);
             }
@@ -194,9 +158,9 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
 
     /**
      * Тестовый режим применяется немедленно: конфигурация сохраняется,
-     * сессии обоих транспортов (реальная и демо) сбрасываются — вход
+     * сессии обоих транспортов (реальная и демо) сбрасываются - вход
      * выполняется заново уже под актуальный источник данных.
-     * Сохранение не удалось — откатываем переключатель.
+     * Сохранение не удалось - откатываем переключатель.
      */
     const handleTestMode = async (value: boolean) => {
         if (testModeBusy || value === config.testMode) return;
@@ -208,6 +172,9 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
             patch({ testMode: config.testMode });
             return;
         }
+        // Даём ручке переключателя доиграть, иначе экран входа появляется
+        // в тот же кадр и движение выглядит резким.
+        await new Promise((resolve) => window.setTimeout(resolve, 220));
         await dropAllSessions();
         requireReauth();
     };
@@ -217,8 +184,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
         setTestResult(null);
         setTestError(null);
         try {
-            // Проверяем именно то, что на экране: сохранение перед тестом
-            // фиксирует черновик, иначе команда читает старый config.json.
+            // Проверка должна идти по текущим полям, а не по прошлому config.json.
             const saved = await saveConfig({ ...draftRef.current }, { silent: true });
             if (!saved) {
                 setTestError(t('settings.saveError'));
@@ -234,18 +200,6 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
         }
     };
 
-    /** Ручное открытие папки журнала: ошибка не должна теряться в консоли. */
-    const handleOpenAuditFolder = async () => {
-        try {
-            await system.openAuditFolder();
-        } catch (err) {
-            toast.error(toIpcError(err).message, { id: 'audit-folder-error' });
-        }
-    };
-
-    /** StartTLS неприменим к ldaps://: TLS уже встроен в соединение (порт 636). */
-    const isLdaps = draft.ldapUrl.trim().toLowerCase().startsWith('ldaps://');
-
     const authModeLabel = (mode: ConnectionTest['authMode']) =>
         mode === 'integrated'
             ? t('settings.ad.authModeIntegrated')
@@ -253,10 +207,10 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
               ? t('settings.ad.authModeAccount')
               : t('settings.ad.authModeAnonymous');
 
-    const themeButtons: { value: Theme; icon: typeof Sun; label: string }[] = [
-        { value: 'light', icon: Sun, label: t('settings.interface.themes.light') },
-        { value: 'dark', icon: Moon, label: t('settings.interface.themes.dark') },
-        { value: 'system', icon: Monitor, label: t('settings.interface.themes.system') },
+    const themeButtons: { value: Theme; label: string }[] = [
+        { value: 'light', label: t('settings.interface.themes.light') },
+        { value: 'dark', label: t('settings.interface.themes.dark') },
+        { value: 'system', label: t('settings.interface.themes.system') },
     ];
 
     const viewTitles: Record<SettingsView, string> = {
@@ -270,75 +224,36 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
         <PageLayout
             id="settings"
             title={viewTitles[view]}
+            onBack={view !== 'menu' ? () => setView('menu') : preAuth ? onBackToLogin : undefined}
+            backLabel={view !== 'menu' ? t('settings.back') : t('auth.title')}
             rightElement={
-                preAuth ? (
-                    <Button
-                        variant="outline"
-                        onClick={onBackToLogin}
-                        className="h-[34px] px-4 text-[0.72rem] font-black gap-2 normal-case"
-                    >
-                        <ArrowLeft size={13} />
-                        {t('auth.title')}
-                    </Button>
-                ) : autoSavedAt ? (
-                    <span className="inline-flex items-center gap-1.5 text-[0.68rem] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tight normal-case">
-                        <Check size={12} />
+                autoSavedAt ? (
+                    <span className="text-ui-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tight normal-case">
                         {t('settings.ad.autoSaved')}
                     </span>
                 ) : undefined
             }
             contentClassName="overflow-y-auto scrollbar-hide p-4 sm:p-6"
         >
-            <div className="shrink-0 w-full max-w-2xl mx-auto my-auto flex flex-col gap-5 py-6">
-                {view !== 'menu' && (
-                    <button
-                        type="button"
-                        onClick={() => setView('menu')}
-                        className="self-start inline-flex items-center gap-2 text-[0.75rem] font-black text-muted-foreground hover:text-primary transition-colors uppercase tracking-tight"
-                    >
-                        <ArrowLeft size={14} />
-                        {t('settings.back')}
-                    </button>
-                )}
-
+            <div className="shrink-0 w-full max-w-[600px] mx-auto my-auto flex flex-col gap-5 py-6">
                 {view === 'menu' && (
                     <div className="flex flex-col gap-3">
-                        <MenuRow
-                            icon={Database}
-                            tint="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            title={t('settings.ad.title')}
-                            onClick={() => setView('ad')}
-                        />
-                        <MenuRow
-                            icon={Lock}
-                            tint="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            title={t('settings.security.title')}
-                            onClick={() => setView('security')}
-                        />
-                        <MenuRow
-                            icon={Palette}
-                            tint="bg-primary/10 text-primary"
-                            title={t('settings.interface.title')}
-                            onClick={() => setView('interface')}
-                        />
+                        <MenuRow title={t('settings.ad.title')} onClick={() => setView('ad')} />
+                        <MenuRow title={t('settings.security.title')} onClick={() => setView('security')} />
+                        <MenuRow title={t('settings.interface.title')} onClick={() => setView('interface')} />
                     </div>
                 )}
 
                 {view === 'ad' && (
                     <div className="flex flex-col gap-5">
-                        <div className="bg-surface rounded-2xl p-5 flex items-center justify-between gap-6">
-                            <div className="flex items-center gap-4 min-w-0">
-                                <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                    <FlaskConical size={18} aria-hidden />
+                        <div className="bg-surface border border-border rounded-[16px] p-[16px] shadow-sm flex items-center justify-between gap-[16px]">
+                            <div className="flex flex-col gap-0.5 min-w-0 pr-4">
+                                <span className="text-ui-label font-bold text-foreground leading-snug">
+                                    {t('settings.ad.testModeLabel')}
                                 </span>
-                                <div className="flex flex-col gap-1 min-w-0">
-                                    <span className="text-[0.9rem] font-black text-foreground leading-snug">
-                                        {t('settings.ad.testModeLabel')}
-                                    </span>
-                                    <span className="text-[0.72rem] text-muted-foreground font-medium leading-snug">
-                                        {t('settings.ad.testModeDesc')}
-                                    </span>
-                                </div>
+                                <span className="text-ui-xs text-muted-foreground leading-snug">
+                                    {t('settings.ad.testModeDesc')}
+                                </span>
                             </div>
                             <Switch
                                 id="testMode"
@@ -346,22 +261,11 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                 onChange={(value) => void handleTestMode(value)}
                                 disabled={testModeBusy}
                                 ariaLabel={t('settings.ad.testModeLabel')}
+                                tone="amber"
                             />
                         </div>
 
-                        <div className="flex flex-col gap-5 bg-surface rounded-2xl p-6">
-                            <p className="text-[0.72rem] text-muted-foreground font-medium leading-relaxed">
-                                {t('settings.ad.hint')}
-                            </p>
-
-                            <p className="text-[0.72rem] text-muted-foreground/80 font-medium leading-relaxed">
-                                {t('settings.ad.encryptedHint')}
-                            </p>
-
-                            <p className="text-[0.72rem] font-bold text-amber-600 dark:text-amber-400 leading-relaxed">
-                                {t('settings.ad.tlsRequiredHint')}
-                            </p>
-
+                        <div className="flex flex-col gap-3 bg-surface border border-border rounded-[16px] p-[16px] shadow-sm">
                             <Field id="ldapUrl" label={t('settings.ad.ldapUrlLabel')}>
                                 <Input
                                     id="ldapUrl"
@@ -369,7 +273,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                     value={draft.ldapUrl}
                                     onChange={(e) => patch({ ldapUrl: e.target.value })}
                                     placeholder={t('settings.ad.ldapUrlPlaceholder')}
-                                    className="w-full h-[42px] text-[0.85rem]"
+                                    className="w-full h-[40px]"
                                     autoComplete="off"
                                     spellCheck={false}
                                 />
@@ -382,7 +286,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                     value={draft.baseDn}
                                     onChange={(e) => patch({ baseDn: e.target.value })}
                                     placeholder={t('settings.ad.baseDnPlaceholder')}
-                                    className="w-full h-[42px] text-[0.85rem]"
+                                    className="w-full h-[40px]"
                                     autoComplete="off"
                                     spellCheck={false}
                                 />
@@ -390,20 +294,13 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
 
                             <div className="flex flex-col gap-4 pt-3 border-t border-border/60">
                                 <ToggleRow
-                                    id="startTls"
-                                    checked={!isLdaps}
-                                    onChange={() => undefined}
-                                    label={t('settings.ad.startTlsLabel')}
-                                    hint={isLdaps ? t('settings.ad.startTlsLdapsNote') : t('settings.ad.startTlsHint')}
-                                    disabled
-                                />
-                                <ToggleRow
                                     id="invalidTls"
                                     checked={draft.allowInvalidTls}
                                     onChange={(value) => patch({ allowInvalidTls: value })}
                                     label={t('settings.ad.invalidTlsLabel')}
                                     hint={t('settings.ad.invalidTlsHint')}
-                                    warning={t('settings.ad.invalidTlsWarning')}
+                                    tone="amber"
+                                    alert
                                 />
                             </div>
 
@@ -412,54 +309,42 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                     type="button"
                                     variant="primary"
                                     onClick={() => void handleTest()}
-                                    disabled={isTesting || !draft.ldapUrl}
-                                    className="h-[40px] px-6 text-[0.8rem] font-black gap-2"
+                                    disabled={isTesting || (!draft.ldapUrl && !draft.testMode)}
+                                    className="h-11 min-w-[220px] px-6 text-ui-md font-bold"
                                 >
-                                    {isTesting ? <Loader2 size={14} className="animate-spin" /> : <PlugZap size={14} />}
                                     {isTesting ? t('settings.ad.testingBtn') : t('settings.ad.testBtn')}
                                 </Button>
 
-                                <span className="text-[0.68rem] text-muted-foreground/70 font-medium text-center leading-snug">
-                                    {t('settings.ad.testHint')}
-                                </span>
-
                                 {testError && (
-                                    <div className="w-full rounded-lg bg-red-500/[0.08] px-4 py-3 flex items-start gap-2.5">
-                                        <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />
-                                        <div className="flex flex-col gap-1 min-w-0">
-                                            <span className="text-[0.78rem] font-black text-red-500">
-                                                {t('settings.ad.testFailedTitle')}
-                                            </span>
-                                            <span className="text-[0.73rem] text-muted-foreground font-medium break-words">
-                                                {testError}
-                                            </span>
-                                        </div>
+                                    <div className="w-full rounded-lg bg-red-500/[0.08] px-4 py-3 flex flex-col gap-1">
+                                        <span className="text-ui-label font-black text-red-500">
+                                            {t('settings.ad.testFailedTitle')}
+                                        </span>
+                                        <span className="text-ui-sm text-muted-foreground font-medium break-words">
+                                            {testError}
+                                        </span>
                                     </div>
                                 )}
 
                                 {testResult && (
                                     <div className="w-full rounded-lg bg-emerald-500/[0.08] px-4 py-3 flex flex-col items-center gap-1.5 text-center">
-                                        <div className="flex items-center gap-2">
-                                            <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
-                                            <span className="text-[0.78rem] font-black text-emerald-600 dark:text-emerald-400">
-                                                {t('settings.ad.testOkTitle')}
-                                            </span>
-                                        </div>
-                                        <span className="text-[0.72rem] text-muted-foreground font-bold">
+                                        <span className="text-ui-label font-black text-emerald-600 dark:text-emerald-400">
+                                            {t('settings.ad.testOkTitle')}
+                                        </span>
+                                        <span className="text-ui-sm text-muted-foreground font-bold">
                                             {t('settings.ad.testOkText', {
                                                 ms: testResult.bindMs,
                                                 server: testResult.serverDnsName ?? '?',
                                             })}
-                                            {' · '}
+                                            {', '}
                                             {authModeLabel(testResult.authMode)}
                                         </span>
                                         {testResult.defaultNamingContext && !draft.baseDn && (
                                             <button
                                                 type="button"
                                                 onClick={() => patch({ baseDn: testResult.defaultNamingContext ?? '' })}
-                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-[0.68rem] font-black hover:bg-primary/15 transition-colors"
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-ui-xs font-black hover:bg-primary/15 transition-colors"
                                             >
-                                                <ShieldCheck size={11} />
                                                 {t('settings.ad.useAsBaseDnBtn')}: {testResult.defaultNamingContext}
                                             </button>
                                         )}
@@ -477,18 +362,17 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                             checked={draft.auditEnabled}
                             onChange={(value) => patch({ auditEnabled: value })}
                             label={t('settings.security.auditLabel')}
-                            hint={t('settings.security.auditHint')}
                         />
 
                         <div className="flex items-start justify-between gap-6 w-full pt-3 border-t border-border/60">
                             <div className="flex flex-col gap-1 min-w-0">
                                 <label
                                     htmlFor="clipboardClear"
-                                    className="text-[0.85rem] text-foreground font-bold leading-snug"
+                                    className="text-ui-label text-foreground font-bold leading-snug"
                                 >
                                     {t('settings.security.clipboardLabel')}
                                 </label>
-                                <span className="text-[0.7rem] text-muted-foreground font-medium leading-snug">
+                                <span className="text-ui-xs text-muted-foreground font-medium leading-snug">
                                     {t('settings.security.clipboardHint')}
                                 </span>
                             </div>
@@ -510,10 +394,13 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                         <div className="w-full flex justify-center pt-3 border-t border-border/60">
                             <button
                                 type="button"
-                                onClick={() => void handleOpenAuditFolder()}
-                                className="inline-flex items-center gap-2 px-4 py-2 text-[0.68rem] font-bold uppercase tracking-tight text-muted-foreground hover:text-primary transition-colors bg-[#e6ebf2] dark:bg-white/[0.08] rounded-lg"
+                                onClick={() => {
+                                    void system.openAuditFolder().catch((err) => {
+                                        toast.error(toIpcError(err).message, { id: 'audit-folder-error' });
+                                    });
+                                }}
+                                className="inline-flex items-center gap-2 px-4 py-2 text-ui-xs font-bold uppercase tracking-tight text-muted-foreground hover:text-primary transition-colors bg-[#e6ebf2] dark:bg-white/[0.08] rounded-lg"
                             >
-                                <FolderOpen size={13} />
                                 {t('settings.security.openAuditFolderBtn')}
                             </button>
                         </div>
@@ -523,23 +410,22 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                 {view === 'interface' && (
                     <div className="flex flex-col gap-5 bg-surface rounded-2xl p-6">
                         <div className="flex flex-col gap-3">
-                            <span className="text-[0.68rem] font-black text-muted-foreground uppercase tracking-tight">
+                            <span className="text-ui-label font-black text-muted-foreground uppercase tracking-tight">
                                 {t('settings.interface.themeLabel')}
                             </span>
                             <div className="flex items-center justify-center gap-3">
-                                {themeButtons.map(({ value, icon: Icon, label }) => (
+                                {themeButtons.map(({ value, label }) => (
                                     <button
                                         key={value}
                                         type="button"
                                         onClick={() => patch({ theme: value })}
-                                        className={`w-[92px] p-3 rounded-xl flex flex-col items-center gap-2 transition-all border-none ${
+                                        className={`w-[92px] p-3 rounded-xl flex flex-col items-center gap-2 transition-all duration-300 border-none ${
                                             theme === value
                                                 ? 'bg-primary text-primary-foreground scale-105'
                                                 : 'bg-[#e6ebf2] dark:bg-white/[0.08] text-muted-foreground hover:bg-[#dde4ed] dark:hover:bg-white/[0.13]'
                                         }`}
                                     >
-                                        <Icon className="w-5 h-5 shrink-0" />
-                                        <span className="text-[0.6rem] font-bold uppercase tracking-tight">
+                                        <span className="text-ui-caption font-bold uppercase tracking-tight">
                                             {label}
                                         </span>
                                     </button>
@@ -548,7 +434,7 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                         </div>
 
                         <div className="flex flex-col gap-3 pt-3 border-t border-border/60">
-                            <span className="text-[0.68rem] font-black text-muted-foreground uppercase tracking-tight">
+                            <span className="text-ui-label font-black text-muted-foreground uppercase tracking-tight">
                                 {t('settings.interface.languageLabel')}
                             </span>
                             <div className="flex items-center justify-center gap-3">
@@ -560,14 +446,14 @@ export function SettingsTab({ preAuth = false, onBackToLogin }: SettingsTabProps
                                             void setLanguage(lang);
                                             patch({ language: lang });
                                         }}
-                                        className={`w-[92px] p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all border-none ${
+                                        className={`w-[92px] p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all duration-300 border-none ${
                                             language === lang
                                                 ? 'bg-primary text-primary-foreground scale-105'
                                                 : 'bg-[#e6ebf2] dark:bg-white/[0.08] text-muted-foreground hover:bg-[#dde4ed] dark:hover:bg-white/[0.13]'
                                         }`}
                                     >
-                                        <span className="text-[0.8rem] font-black">{lang.toUpperCase()}</span>
-                                        <span className="text-[0.6rem] font-bold uppercase tracking-tight">
+                                        <span className="text-ui-base font-black">{lang.toUpperCase()}</span>
+                                        <span className="text-ui-caption font-bold uppercase tracking-tight">
                                             {t(`settings.interface.${lang}`)}
                                         </span>
                                     </button>

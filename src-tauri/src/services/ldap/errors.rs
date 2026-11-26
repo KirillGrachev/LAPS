@@ -1,5 +1,5 @@
 //! Классификация ошибок LDAP: отказ аутентификации AD, анонимный поиск,
-//! сетевые сбои, отказ в доступе к атрибутам. Тексты сообщений — подсказки
+//! сетевые сбои, отказ в доступе к атрибутам. Тексты сообщений - подсказки
 //! пользователю (инженеру поддержки), а не сырые коды протокола.
 
 use ldap3::LdapError;
@@ -17,7 +17,7 @@ pub(super) const RC_NO_SUCH_OBJECT: u32 = 32;
 /// Классификация кода результата поисковой/модифицирующей операции.
 ///
 /// Самый частый случай в боевых доменах: `rc=1` (operationsError) с текстом
-/// «a successful bind must be completed» — сервер запрещает анонимный поиск.
+/// «a successful bind must be completed» - сервер запрещает анонимный поиск.
 /// Превращаем это в понятное указание заполнить учётную запись.
 pub(super) fn classify_search_result(url: &str, result: &ldap3::LdapResult) -> AppError {
     let text = result.text.trim();
@@ -35,7 +35,7 @@ pub(super) fn classify_search_result(url: &str, result: &ldap3::LdapResult) -> A
         }
         RC_UNAVAILABLE | RC_BUSY => {
             return AppError::LdapUnreachable(format!(
-                "{url} — контроллер домена недоступен или перегружен (код {}): {text}",
+                "{url}: контроллер домена недоступен или перегружен (код {}): {text}",
                 result.rc
             ))
         }
@@ -85,12 +85,12 @@ fn classify_io_error(url: &str, io: &std::io::Error) -> AppError {
     match io.kind() {
         ErrorKind::TimedOut => AppError::LdapTimeout,
         ErrorKind::ConnectionRefused => AppError::LdapUnreachable(format!(
-            "{url} — подключение отклонено (проверьте адрес и порт: 389 для ldap://, 636 для ldaps://)"
+            "{url}: подключение отклонено (проверьте адрес и порт: 389 для ldap://, 636 для ldaps://)"
         )),
         ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted | ErrorKind::BrokenPipe => {
-            AppError::LdapUnreachable(format!("{url} — соединение разорвано сервером"))
+            AppError::LdapUnreachable(format!("{url}: соединение разорвано сервером"))
         }
-        _ => AppError::LdapUnreachable(format!("{url} — {io}")),
+        _ => AppError::LdapUnreachable(format!("{url}: {io}")),
     }
 }
 

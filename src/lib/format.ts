@@ -2,7 +2,7 @@
  * Форматирование дат и статусов срока действия пароля LAPS.
  *
  * Бэкенд отдаёт время в RFC 3339 с локальным смещением
- * (`2026-10-07T12:00:00+03:00`) — `parseISO` из date-fns читает его как есть.
+ * (`2026-10-07T12:00:00+03:00`) - `parseISO` из date-fns читает его как есть.
  */
 import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
 import { enUS, ru } from 'date-fns/locale';
@@ -24,7 +24,7 @@ export function formatDateTime(value: string | null | undefined, language: Langu
     }
 }
 
-/** Дата/время для журнала: `05.10.2026 14:03:02` — привычный деловой вид. */
+/** Дата/время для журнала: `05.10.2026 14:03:02` - привычный деловой вид. */
 export function formatLogTime(value: string, language: Language): string {
     try {
         const date = parseISO(value);

@@ -1,13 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { LapsInfo } from '../types';
 import { useSession } from './SessionContext';
+import { clearClipboardIfEquals } from '../lib/clipboard';
 
 interface SearchContextType {
     isSearching: boolean;
     setIsSearching: (val: boolean) => void;
     isRotating: boolean;
     setIsRotating: (val: boolean) => void;
-    /** Последняя операция сброса срока — для раздельных индикаторов кнопок. */
+    /** Последняя операция сброса срока - для раздельных индикаторов кнопок. */
     rotationKind: 'now' | 'at' | null;
     setRotationKind: (val: 'now' | 'at' | null) => void;
     result: LapsInfo | null;
@@ -16,6 +17,8 @@ interface SearchContextType {
     setError: (val: string | null) => void;
     lastSearchQuery: string;
     setLastSearchQuery: (val: string) => void;
+    /** Поколение сессии: растёт при выходе, чтобы поздние ответы не вернули карточку. */
+    sessionEpoch: number;
 }
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
@@ -27,6 +30,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     const [result, setResult] = useState<LapsInfo | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [lastSearchQuery, setLastSearchQuery] = useState('');
+    const [sessionEpoch, setSessionEpoch] = useState(0);
     const { session, checking } = useSession();
 
     /**
@@ -36,15 +40,11 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (checking || session) return;
         const password = result?.password;
+        setSessionEpoch((value) => value + 1);
         if (password) {
-            void (async () => {
-                try {
-                    const current = await navigator.clipboard.readText();
-                    if (current === password) await navigator.clipboard.writeText('');
-                } catch {
-                    // Clipboard может быть недоступен — это best effort.
-                }
-            })();
+            void clearClipboardIfEquals(password).catch(() => {
+                // Clipboard может быть недоступен - это best effort.
+            });
         }
         setResult(null);
         setError(null);
@@ -66,6 +66,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
                 setError,
                 lastSearchQuery,
                 setLastSearchQuery,
+                sessionEpoch,
             }}
         >
             {children}

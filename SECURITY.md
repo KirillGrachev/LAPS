@@ -9,7 +9,8 @@ or a domain credential.
 
 | Version | Supported |
 | --- | --- |
-| 2.1.x | Yes |
+| 2.2.x | Yes |
+| 2.1.x | No |
 | 1.x (PowerShell) | No |
 
 Security fixes land on `main` and in the next patch release. Include the commit
@@ -74,11 +75,19 @@ Out of scope:
   default. Disabling it is an explicit, warned setting and is recorded in the
   audit event as `verify_cert=false`.
 - **Decryption uses the native Windows LAPS API.** `lapsutil!DecryptNormalMode`
-  runs under a token created for the account entered at sign-in, or under the
-  current Windows account for SSO. For SSO, `NCryptUnprotectSecret` is a
-  fallback; an explicit sign-in never falls back, so a password is not decrypted
-  under an identity the operator did not choose. The API output buffer is
-  zeroized before it is freed.
+  runs under a token created for the account entered at sign-in
+  (`LogonWithCredentials`, then `LogonUser(INTERACTIVE)` if the network token is
+  not sufficient), or under the current Windows account for SSO. The domain for
+  a short account name is taken from the Base DN or LDAP URL before falling back
+  to the Windows session. Both `flags=0` and `0x20000000` are attempted because
+  the export is undocumented. For SSO, `NCryptUnprotectSecret` is a fallback; an
+  explicit sign-in never falls back, so a password is not decrypted under an
+  identity the operator did not choose. The API output buffer is zeroized before
+  it is freed.
+- **Clipboard access goes through Rust.** The WebView writes text through a
+  session-gated command and never reads arbitrary clipboard content: auto-clear
+  compares the value in the backend and removes it only when it still holds the
+  password. In the browser demo the Clipboard API is used instead.
 - **Audit is written by Rust commands**, not by the UI, for search, failures,
   rotation, copy, sign-in, sign-out, configuration and connection tests. It can
   be switched off in settings; turning it off is not itself audited. Write

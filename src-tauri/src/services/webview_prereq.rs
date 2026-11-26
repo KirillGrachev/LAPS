@@ -8,7 +8,7 @@
 //!
 //! Инсталлятор поставки несёт встроенный бутстраппер WebView2
 //! (`webviewInstallMode: embedBootstrapper`), ручная проверка нужна для
-//! нестандартных окружений. Отключение — `KMLAPS_SKIP_WEBVIEW_CHECK=1`.
+//! нестандартных окружений. Отключение - `KMLAPS_SKIP_WEBVIEW_CHECK=1`.
 
 use windows::core::w;
 use windows::Win32::System::Registry::{
@@ -92,12 +92,12 @@ pub fn report_missing_runtime() {
     const DOWNLOAD_URL: &str = "https://developer.microsoft.com/microsoft-edge/webview2/";
 
     let text = w!(
-        "Не найден Microsoft Edge WebView2 Runtime — без него интерфейс приложения не отобразится.\n\n\
+        "Не найден Microsoft Edge WebView2 Runtime: без него интерфейс приложения не отобразится\n\n\
          Отправить вас на официальную страницу загрузки WebView2 Runtime?\n\n\
          (В корпоративной сети установите Evergreen Bootstrapper или offline-инсталлятор \
-         из внутреннего репозитория ПО.)"
+         из внутреннего репозитория ПО)"
     );
-    let caption = w!("KMAruda LAPS — отсутствует WebView2 Runtime");
+    let caption = w!("KMAruda LAPS: отсутствует WebView2 Runtime");
     unsafe {
         let answer = MessageBoxW(None, text, caption, MB_YESNO | MB_ICONWARNING);
         if answer == IDYES {

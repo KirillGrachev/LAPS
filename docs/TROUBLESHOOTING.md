@@ -58,7 +58,7 @@ include it in a bug report.
   output captured by your deployment tool. The default filter is `info`; set
   `RUST_LOG=app_lib=debug` for details. Passwords are never logged.
 - Audit journal: Settings → Security → "Log folder", or
-  `%APPDATA%\com.kmaruda.laps\audit.log`.
+  `%APPDATA%\KMAruda LAPS\audit.log`.
 
 ## Build failures
 

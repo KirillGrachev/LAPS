@@ -5,7 +5,7 @@
 //! выдерживает никакой проверки безопасником. Здесь каждая операция
 //! чтения/сброса пароля журналируется на бэкенде до возврата результата.
 //!
-//! Формат файла — **читаемые человеком строки фиксированной ширины**
+//! Формат файла - **читаемые человеком строки фиксированной ширины**
 //! (журнал открывают в нотпаде и читают глазами, а не парсят скриптами):
 //!
 //! ```text
@@ -14,7 +14,7 @@
 //! 2026-10-05 13:44:02.008 +03:00 | search_failed    | COMPUTER_NOT_FOUND | ws99             | -                 | KMARUDA\ivanov@HELP-01 | Компьютер не найден…
 //! ```
 //!
-//! Колонки разделены ` | `; подробности (могут содержать что угодно) —
+//! Колонки разделены ` | `; подробности (могут содержать что угодно) -
 //! всегда последняя колонка, при записи в них заменяется ` | ` на ` / `.
 //! Старые строки и битые данные пропускаются при чтении без падения.
 //!
@@ -22,10 +22,10 @@
 //! пишет живой `audit.log`, а при старте файл прошлого запуска пакуется
 //! в gzip-архив `audit-<метка времени>.log.gz (хранится не более 14
 //! архивов). Чрезмерно большой живой файл внутри одного запуска
-//! архивируется так же. Чтение и пагинация — сквозные по живому файлу
+//! архивируется так же. Чтение и пагинация - сквозные по живому файлу
 //! и всем архивам.
 //!
-//! Важно: в журнал **никогда** не попадает значение пароля — только факт
+//! Важно: в журнал **никогда** не попадает значение пароля - только факт
 //! операции, целевой компьютер, субъект и результат.
 
 use std::fs::{self, File, OpenOptions};
@@ -36,7 +36,6 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
-use chrono::Local;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -47,7 +46,7 @@ use crate::error::AppError;
 /// запуск пишет живой файл, прошлые уходят в архив).
 const ARCHIVE_PREFIX: &str = "audit-";
 const ARCHIVE_SUFFIX: &str = ".log.gz";
-/// Сколько архивов храним; старее — удаляем.
+/// Сколько архивов храним; старее - удаляем.
 const MAX_ARCHIVES: usize = 14;
 /// Защита от аномальных объёмов внутри одного запуска: превысив, файл
 /// тоже уходит в архив и журнал продолжается с чистого листа.
@@ -156,10 +155,7 @@ pub struct AuditPage {
 /// (`2026-10-05 13:42:07.123 +03:00`) с нормализацией дроби до
 /// миллисекунд: ширина колонки времени всегда постоянна.
 fn pretty_ts(rfc: &str) -> String {
-    match chrono::DateTime::parse_from_rfc3339(rfc) {
-        Ok(dt) => dt.format("%Y-%m-%d %H:%M:%S%.3f %:z").to_string(),
-        Err(_) => rfc.to_string(),
-    }
+    crate::services::laps::time::pretty_timestamp(rfc)
 }
 
 /// Обратное преобразование: читаемый вид → RFC 3339 (миллисекунды)
@@ -167,9 +163,7 @@ fn pretty_ts(rfc: &str) -> String {
 /// Парсим в `DateTime<FixedOffset>`: спецификатор `%:z` требует
 /// присутствия смещения в контексте форматирования.
 fn machine_ts(pretty: &str) -> Option<String> {
-    chrono::DateTime::parse_from_str(pretty, "%Y-%m-%d %H:%M:%S%.3f %:z")
-        .ok()
-        .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string())
+    crate::services::laps::time::machine_timestamp(pretty)
 }
 
 /// Колонка фиксированной ширины: обрезка с «…» либо добивка пробелами.
@@ -262,10 +256,10 @@ impl AuditLogger {
     }
 
     /// Дописывает событие. Ошибка записи не должна ронять основную
-    /// операцию (чтение пароля важнее журнала) — только warn в трейсинг.
+    /// операцию (чтение пароля важнее журнала) - только warn в трейсинг.
     pub fn append(&self, mut event: AuditEvent) {
         if event.ts.is_empty() {
-            event.ts = Local::now().to_rfc3339();
+            event.ts = crate::services::laps::time::now_rfc3339_local();
         }
         if let Err(e) = self.append_inner(&event) {
             warn!(error = %e, "не удалось записать событие аудита");
@@ -280,7 +274,7 @@ impl AuditLogger {
         code: impl Into<String>,
     ) -> AuditEvent {
         AuditEvent {
-            ts: Local::now().to_rfc3339(),
+            ts: crate::services::laps::time::now_rfc3339_local(),
             actor,
             action,
             target,
@@ -313,7 +307,7 @@ impl AuditLogger {
         Ok(())
     }
 
-    /// Если текущий файл перерос предел одного запуска — архивируем его
+    /// Если текущий файл перерос предел одного запуска - архивируем его
     /// gzip'ом и продолжаем с чистого листа.
     fn rotate_if_needed(&self, path: &Path) -> Result<(), AppError> {
         let Ok(meta) = fs::metadata(path) else {
@@ -327,7 +321,7 @@ impl AuditLogger {
 
     /// Архивация журнала ПРЕДЫДУЩЕГО запуска: вызывается при старте
     /// приложения. Живой `audit.log` пакуется в `audit-<метка>.log.gz`,
-    /// новый запуск начинает пустой файл — читать актуальное легко,
+    /// новый запуск начинает пустой файл - читать актуальное легко,
     /// а история не раздувает дисковое количество текста.
     pub fn archive_previous_run(&self) {
         let path = self.log_path();
@@ -347,7 +341,7 @@ impl AuditLogger {
     /// Маловероятный конфликт имён (две ротации в одну секунду): уточняем.
     fn archive_current(&self, reason: &str) -> Result<(), AppError> {
         let path = self.log_path();
-        let stamp = Local::now().format("%Y-%m-%d-%H%M%S");
+        let stamp = crate::services::laps::time::archive_stamp_local();
         let archive = self
             .dir
             .join(format!("{ARCHIVE_PREFIX}{stamp}{ARCHIVE_SUFFIX}"));
@@ -417,7 +411,7 @@ impl AuditLogger {
     /// Внутри файла строки идут в порядке записи.
     /// Newest first: после реверса последовательности «старые→новые»
     /// стабильная сортировка по убыванию ts сохраняет для совпадающих
-    /// меток порядок «новее записано — выше в выдаче».
+    /// меток порядок «новее записано - выше в выдаче».
     pub fn list(&self, limit: u32, offset: u32) -> Result<AuditPage, AppError> {
         let limit = limit.clamp(1, 500) as usize;
         let offset = offset as usize;
@@ -477,7 +471,7 @@ impl AuditLogger {
 /// Субъект операции для журнала.
 ///
 /// Интегрированная аутентификация: домен и пользователь текущей сессии
-/// Windows (`USERDOMAIN\USERNAME@COMPUTERNAME`) — те же сведения, что видит
+/// Windows (`USERDOMAIN\USERNAME@COMPUTERNAME`) - те же сведения, что видит
 /// контроллер домена в своих журналах, что позволяет коррелировать события.
 /// Явный вход: учётная запись, введённая на экране входа.
 pub fn current_actor(use_integrated_auth: bool, bind_dn: Option<&str>) -> String {
@@ -507,7 +501,7 @@ fn current_user_fallback() -> String {
 }
 
 /// На Windows USERDOMAIN/USERNAME практически всегда установлены;
-/// страховка — имя из окружения процесса.
+/// страховка - имя из окружения процесса.
 #[cfg(windows)]
 fn current_user_fallback() -> String {
     env_or("USERNAME").unwrap_or_else(|| "unknown".to_string())
@@ -553,7 +547,7 @@ mod tests {
 
     #[test]
     /// Шапка + одна запись.
-    /// Читаемый вид: дата, время и смещение — раздельно, колонки ровные.
+    /// Читаемый вид: дата, время и смещение - раздельно, колонки ровные.
     /// Разделитель внутри подробностей нейтрализован.
     /// Круговой прогон: строка файла → событие → те же поля.
     fn file_lines_are_human_readable_and_roundtrip() {

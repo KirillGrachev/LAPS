@@ -52,9 +52,9 @@ export const t = (key: TranslationKeys | string, options?: TranslateOptions) => 
 };
 
 /**
- * Применяет сохранённый язык интерфейса к i18next и `<html lang>`.
- * Вызывается после загрузки конфигурации: без этого выбор языка
- * переживал сохранение в config.json, но сбрасывался при перезапуске.
+ * Применяет сохранённый язык к i18next и `<html lang>`.
+ * Без этого выбор языка переживал сохранение в config.json, но сбрасывался
+ * при перезапуске приложения.
  */
 export function applyLanguage(language: string): void {
     const next: Language = language === 'en' ? 'en' : 'ru';

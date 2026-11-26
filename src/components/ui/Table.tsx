@@ -2,7 +2,7 @@ import { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes, forwardRef } from '
 
 const Table = forwardRef<HTMLTableElement, HTMLAttributes<HTMLTableElement>>(({ className = '', ...props }, ref) => (
     <div className="overflow-x-auto w-full">
-        <table ref={ref} className={`w-full border-collapse text-[0.85rem] min-w-[980px] ${className}`} {...props} />
+        <table ref={ref} className={`w-full border-collapse text-ui-base min-w-[980px] ${className}`} {...props} />
     </div>
 ));
 Table.displayName = 'Table';
@@ -32,7 +32,7 @@ const TableHead = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCel
     ({ className = '', ...props }, ref) => (
         <th
             ref={ref}
-            className={`bg-[#f1f5f9] dark:bg-[#131316] text-left px-[14px] py-[10px] font-semibold text-[#64748b] dark:text-[#94a3b8] text-[0.7rem] uppercase ${className}`}
+            className={`bg-[#f1f5f9] dark:bg-[#131316] text-left px-[14px] py-[10px] font-semibold text-[#64748b] dark:text-[#94a3b8] text-ui-xs uppercase ${className}`}
             {...props}
         />
     ),

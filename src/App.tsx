@@ -50,7 +50,7 @@ function MainContent() {
 
 /**
  * Корневой контент: до входа показывается экран аутентификации
- * (или настройки подключения до входа), после входа — основной интерфейс.
+ * (или настройки подключения до входа), после входа - основной интерфейс.
  * После успешного входа пред-авторизационный режим настроек сбрасывается.
  */
 function AppContent() {
@@ -66,7 +66,7 @@ function AppContent() {
         return (
             <div className="fixed inset-0 bg-background flex flex-col items-center justify-center gap-4 select-none">
                 <Logo size="md" />
-                <span className="text-[0.7rem] font-black text-muted-foreground uppercase tracking-tight">
+                <span className="text-ui-xs font-black text-muted-foreground uppercase tracking-tight">
                     {t('app.loading')}
                 </span>
             </div>
@@ -76,7 +76,12 @@ function AppContent() {
     if (!session) {
         return (
             <div className="fixed inset-0 bg-background text-foreground font-sans flex flex-col overflow-hidden select-none">
-                <TitleBar title={t('app.title')} isMobileMenuOpen={false} toggleMobileMenu={() => {}} />
+                <TitleBar
+                    title={t('app.title')}
+                    isMobileMenuOpen={false}
+                    toggleMobileMenu={() => {}}
+                    showMenu={false}
+                />
                 {preAuthSettings ? (
                     <div className="flex-1 flex flex-col min-h-0">
                         <SettingsTab preAuth onBackToLogin={() => setPreAuthSettings(false)} />
@@ -108,8 +113,7 @@ function MainApp() {
                 richColors={true}
                 visibleToasts={3}
                 toastOptions={{
-                    className:
-                        'shadow-2xl rounded-lg bg-surface text-foreground text-[0.85rem] font-bold p-4 z-[99999]',
+                    className: 'shadow-2xl rounded-lg bg-surface text-foreground text-ui-base font-bold p-4 z-[99999]',
                     style: { fontFamily: 'inherit' },
                 }}
                 expand={false}

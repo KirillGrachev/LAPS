@@ -4,7 +4,7 @@ interface LogoProps {
 }
 
 /**
- * Логотип приложения — бренд-иконка KMAruda LAPS (public/app-icon.png),
+ * Логотип приложения - бренд-иконка KMAruda LAPS (public/app-icon.png),
  * единая во всех местах: сайдбар, «О программе», окно, установщик.
  */
 export function Logo({ className = '', size = 'md' }: LogoProps) {

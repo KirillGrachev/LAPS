@@ -34,7 +34,7 @@ export function SearchTab() {
                 />
 
                 {error && (
-                    <div className="w-full rounded-lg bg-red-500/[0.07] px-4 py-2.5 text-center text-[0.78rem] font-bold text-red-500">
+                    <div className="w-full rounded-lg bg-red-500/[0.07] px-4 py-2.5 text-center text-ui-label font-bold text-red-500">
                         {error}
                     </div>
                 )}

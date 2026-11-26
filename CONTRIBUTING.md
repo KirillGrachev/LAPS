@@ -101,4 +101,4 @@ installer.
 5. Wait for the required checks; the maintainer merges with a linear history.
 
 UI changes: attach light and dark screenshots and check the minimum window size
-(900×640).
+(900×680).

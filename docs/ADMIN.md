@@ -71,18 +71,23 @@ root. Keep the sign-in account separate from the engineer's day-to-day account.
 
 | Item | Path |
 | --- | --- |
-| Configuration | `%APPDATA%\com.kmaruda.laps\config.json` |
-| Audit journal | `%APPDATA%\com.kmaruda.laps\audit.log` |
-| Archived journals | `%APPDATA%\com.kmaruda.laps\audit-*.log.gz` (14 kept) |
+| Configuration | `%APPDATA%\KMAruda LAPS\config.json` |
+| Audit journal | `%APPDATA%\KMAruda LAPS\audit.log` |
+| Archived journals | `%APPDATA%\KMAruda LAPS\audit-*.log.gz` (14 kept) |
+| Window state | `%APPDATA%\KMAruda LAPS\window.json` |
 
 The configuration contains no secrets. The audit journal contains computer
 names, account identifiers and operation results; protect the profile folder
 accordingly.
 
+2.2 migrates the 2.1 data directory (`%APPDATA%\com.kmaruda.laps`) to
+`%APPDATA%\KMAruda LAPS` once on first launch: the directory is renamed, or
+copied into a staging directory and renamed when the volumes differ.
+
 ## Upgrading from 1.x
 
 1.x stored a DPAPI-encrypted `config.json` and its journal in
-`%APPDATA%\KMArudaLAPS`. 2.x uses the Tauri data directory and a secret-free
+`%APPDATA%\KMArudaLAPS`. 2.x uses its own data directory and a secret-free
 format, so the connection settings must be entered once. The 1.x journal is not
 migrated and is not deleted.
 
