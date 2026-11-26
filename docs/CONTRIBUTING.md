@@ -5,7 +5,7 @@ checks a pull request must pass.
 
 ## Before you start
 
-- Read [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Read [README.md](README.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
 - For a security issue, follow [SECURITY.md](SECURITY.md), not a public issue.
 - By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 - The project is a native Windows client: PowerShell, RSAT and the
@@ -29,7 +29,7 @@ npm run tauri dev
 ```
 
 The browser preview (`npm run dev`) uses the mock IPC layer and needs no domain.
-See [docs/BUILD.md](docs/BUILD.md) for details and packaging.
+See [BUILD.md](BUILD.md) for details and packaging.
 
 ## Project layout
 

@@ -8,7 +8,7 @@ body:
       value: |
         Do not paste a LAPS password, a sign-in password, a token, a real domain
         name or an internal computer name. Replace them with placeholders.
-        Security issues belong in private reporting, see SECURITY.md.
+        Security issues belong in private reporting, see docs/SECURITY.md.
 
   - type: input
     id: version

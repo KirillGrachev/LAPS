@@ -1,8 +1,8 @@
 # Support
 
 - **Bug or feature request:** open an issue using the templates.
-- **Deployment, AD permissions, TLS:** read [ADMIN.md](docs/ADMIN.md) and
-  [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) first, then ask in
+- **Deployment, AD permissions, TLS:** read [ADMIN.md](ADMIN.md) and
+  [TROUBLESHOOTING.md](TROUBLESHOOTING.md) first, then ask in
   [Discussions](https://github.com/KirillGrachev/LAPS/discussions).
 - **Security vulnerability:** use
   [private vulnerability reporting](https://github.com/KirillGrachev/LAPS/security/advisories/new),
